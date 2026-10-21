@@ -156,12 +156,12 @@ export default function MoreHubScreen() {
             <View className="flex-1 min-w-0">
               <View className="flex-row items-center gap-1.5">
                 <Text className="text-base font-bold text-onSurface truncate">
-                  {user?.businessName || 'Bamidele & Sons Provisions'}
+                  {store.businessName}
                 </Text>
                 <AppIcon name="verified" size={16} color={colors.primary} />
               </View>
               <Text className="text-xs text-onSurfaceVariant mt-0.5 truncate">
-                {user?.tradeHub || 'Idumota Wholesale Depot • Counter Till #1'}
+                {store.marketLocation} • {store.marketStall}
               </Text>
               <View className="flex-row items-center gap-2 mt-1 flex-wrap">
                 <View className="px-2 py-0.5 rounded bg-secondaryContainer">

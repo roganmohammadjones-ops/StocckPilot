@@ -18,6 +18,7 @@ import { createSale, getProducts, getCustomers } from '@/lib/db/queries';
 import { useDataRefresh, useAppDb } from '@/lib/db/provider';
 import type { Product, Customer } from '@/lib/db/types';
 import { printReceipt, shareReceiptPdf } from '@/lib/receipt';
+import { useStoreProfile } from '@/lib/store-profile';
 
 interface CartItem {
   id: string;
@@ -41,48 +42,24 @@ export default function NewSaleModal() {
   const insets = useSafeAreaInsets();
   const db = useAppDb();
   const { triggerRefresh } = useDataRefresh();
+  const store = useStoreProfile();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
-  // Cart State
-  const [cart, setCart] = useState<CartItem[]>([
-    {
-      id: 'prod_1',
-      name: 'Dangote Refined Sugar 50kg',
-      sku: 'DNG-SUG-50',
-      unitPrice: 71000,
-      costPrice: 64500,
-      quantity: 1,
-      profitPerUnit: 6500,
-      icon: 'inventory_2',
-      stockLeft: 45,
-      stockUnit: 'bags',
-    },
-    {
-      id: 'prod_3',
-      name: 'Peak Evaporated Milk 160g',
-      sku: 'PEAK-CAN-48',
-      unitPrice: 28500,
-      costPrice: 25800,
-      quantity: 2,
-      profitPerUnit: 2700,
-      icon: 'local_drink',
-      stockLeft: 60,
-      stockUnit: 'cartons',
-    },
-  ]);
+  // Cart State starts clean and empty
+  const [cart, setCart] = useState<CartItem[]>([]);
 
   // Customer State
   const [customerType, setCustomerType] = useState<'walkin' | 'registered'>('walkin');
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('cust_1');
-  const [phoneNumber, setPhoneNumber] = useState('+234 803 491 8820');
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+  const [phoneNumber, setPhoneNumber] = useState('');
 
   // Payment State
   const [paymentChannel, setPaymentChannel] = useState<'cash' | 'transfer' | 'pos' | 'credit'>('cash');
-  const [tenderedAmount, setTenderedAmount] = useState('130,000');
-  const [discount, setDiscount] = useState(500);
+  const [tenderedAmount, setTenderedAmount] = useState('');
+  const [discount, setDiscount] = useState(0);
 
   // Modals for SKU picker, Barcode Scanner, and Sale Completion
   const [showAddSkuModal, setShowAddSkuModal] = useState(false);
@@ -280,7 +257,13 @@ export default function NewSaleModal() {
           quantity: it.quantity,
           unitPrice: it.unitPrice,
           totalPrice: it.quantity * it.unitPrice,
-        }))
+        })),
+        {
+          businessName: store.businessName,
+          tradeHub: `${store.marketLocation} • ${store.marketStall}`,
+          phone: store.phone,
+          cashierName: store.ownerName,
+        }
       );
     } catch (e: any) {
       Alert.alert('Printing Error', e?.message || 'Could not print receipt.');
@@ -313,7 +296,13 @@ export default function NewSaleModal() {
           quantity: it.quantity,
           unitPrice: it.unitPrice,
           totalPrice: it.quantity * it.unitPrice,
-        }))
+        })),
+        {
+          businessName: store.businessName,
+          tradeHub: `${store.marketLocation} • ${store.marketStall}`,
+          phone: store.phone,
+          cashierName: store.ownerName,
+        }
       );
     } catch (e: any) {
       Alert.alert('PDF Error', e?.message || 'Could not generate PDF receipt.');
@@ -327,7 +316,7 @@ export default function NewSaleModal() {
     const customerPhone = phoneNumber.replace(/[^0-9]/g, '');
     const msg =
       `*RECEIPT #${completedSale.invoiceNo}*%0A` +
-      `*Store:* Bamidele & Sons Provisions%0A` +
+      `*Store:* ${encodeURIComponent(store.businessName)}%0A` +
       `*Total Paid:* ₦${completedSale.netPayable.toLocaleString()}%0A` +
       `*Channel:* ${completedSale.paymentChannel.toUpperCase()}%0A` +
       `*Items:* ${completedSale.items.map((c) => `${c.name} x${c.quantity}`).join(', ')}%0A` +
