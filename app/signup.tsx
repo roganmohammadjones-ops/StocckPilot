@@ -11,6 +11,7 @@ import { AppIcon } from '@/components/icon';
 import { BrandLogo } from '@/components/brand-logo';
 import { colors } from '@/lib/theme';
 import { signupMerchant } from '@/lib/auth';
+import { resetStoreProfileToStandard } from '@/lib/store-profile';
 
 const tradingHubs = [
   'Idumota Wholesale Hub, Lagos',
@@ -25,22 +26,34 @@ const tradingHubs = [
 
 export default function SignupScreen() {
   const router = useRouter();
-  const [businessName, setBusinessName] = useState('Alhaji Musa & Sons Provisions');
-  const [ownerName, setOwnerName] = useState('Alhaji Musa Sani');
-  const [phone, setPhone] = useState('803 491 8820');
+  const [businessName, setBusinessName] = useState('');
+  const [ownerName, setOwnerName] = useState('');
+  const [phone, setPhone] = useState('');
   const [selectedHub, setSelectedHub] = useState(tradingHubs[0]);
   const [showHubPicker, setShowHubPicker] = useState(false);
 
   const handleProceedToOtp = async () => {
+    const finalBusiness = businessName.trim() || 'My Wholesale Depot';
+    const finalOwner = ownerName.trim() || 'Store Manager';
+    const finalPhone = phone.trim() ? `+234 ${phone.trim()}` : '+234 800 000 0000';
+
     await signupMerchant({
-      businessName,
-      ownerName,
-      phone: `+234 ${phone}`,
+      businessName: finalBusiness,
+      ownerName: finalOwner,
+      phone: finalPhone,
       tradeHub: selectedHub,
     });
+
+    resetStoreProfileToStandard({
+      businessName: finalBusiness,
+      ownerName: finalOwner,
+      phone: finalPhone,
+      marketLocation: selectedHub,
+    });
+
     router.push({
       pathname: '/otp-verify',
-      params: { phone: `+234 ${phone}`, businessName, source: 'signup' },
+      params: { phone: finalPhone, businessName: finalBusiness, source: 'signup' },
     });
   };
 
@@ -100,7 +113,8 @@ export default function SignupScreen() {
               <TextInput
                 value={businessName}
                 onChangeText={setBusinessName}
-                placeholder="e.g. Alhaji Musa & Sons Provisions"
+                placeholder="e.g. Adeyemi Wholesale Stores"
+                placeholderTextColor={colors.outline}
                 className="text-sm text-onSurface font-medium outline-none"
               />
             </View>
@@ -113,7 +127,8 @@ export default function SignupScreen() {
               <TextInput
                 value={ownerName}
                 onChangeText={setOwnerName}
-                placeholder="e.g. Alhaji Musa Sani"
+                placeholder="e.g. Babatunde Adeyemi"
+                placeholderTextColor={colors.outline}
                 className="text-sm text-onSurface font-medium outline-none"
               />
             </View>

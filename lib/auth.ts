@@ -14,25 +14,25 @@ export interface UserProfile {
 const AUTH_STORAGE_KEY = 'stockpilot_auth_session';
 
 export const DEMO_MERCHANT: UserProfile = {
-  id: 'merchant_alhaji_musa',
-  name: 'Alhaji Musa Sani',
-  phone: '+234 803 491 8820',
-  email: 'musa.provisions@stockpilot.ng',
-  businessName: 'Musa & Sons Provisions Ltd',
-  tradeHub: 'Idumota Wholesale Hub, Lagos',
+  id: 'merchant_standard',
+  name: 'Store Manager',
+  phone: '+234 800 000 0000',
+  email: 'merchant@stockpilot.ng',
+  businessName: 'My Wholesale Depot',
+  tradeHub: 'Lagos Central Market, Lagos',
   role: 'merchant',
-  isDemo: true,
+  isDemo: false,
 };
 
 export const DEMO_BUYER: UserProfile = {
-  id: 'buyer_topchoice',
-  name: 'Mrs. Folake Adebayo',
-  phone: '+234 802 334 1190',
-  email: 'folake.retail@gmail.com',
-  businessName: 'TopChoice Superstore',
+  id: 'buyer_standard',
+  name: 'Retail Buyer',
+  phone: '+234 800 111 2222',
+  email: 'buyer@stockpilot.ng',
+  businessName: 'Superstore Retail Hub',
   tradeHub: 'Balogun Market, Lagos Island',
   role: 'buyer',
-  isDemo: true,
+  isDemo: false,
 };
 
 let inMemoryUserSession: UserProfile | null = null;
@@ -125,13 +125,13 @@ export async function loginWithCredentials(
 
   // Fallback local verification for trade phone/demo credentials
   const cleanPhone = identifier.replace(/[^0-9]/g, '');
-  if (cleanPhone.length >= 7 || identifier.toLowerCase().includes('demo') || identifier.toLowerCase().includes('musa')) {
+  if (cleanPhone.length >= 7 || identifier.toLowerCase().includes('demo')) {
     const user: UserProfile = {
       id: `usr_${Date.now()}`,
-      name: identifier.toLowerCase().includes('musa') ? 'Alhaji Musa Sani' : 'Verified Merchant',
+      name: 'Store Manager',
       phone: identifier.startsWith('+') ? identifier : `+234 ${identifier}`,
-      businessName: identifier.toLowerCase().includes('musa') ? 'Musa & Sons Provisions Ltd' : 'Local Wholesale Depot',
-      tradeHub: 'Idumota Wholesale Hub, Lagos',
+      businessName: 'My Wholesale Depot',
+      tradeHub: 'Central Wholesale Hub, Lagos',
       role: 'merchant',
       isDemo: false,
     };

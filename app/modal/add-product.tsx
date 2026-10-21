@@ -13,6 +13,7 @@ import { AppIcon } from '@/components/icon';
 import { colors } from '@/lib/theme';
 import { addProduct } from '@/lib/db/queries';
 import { useDataRefresh, useAppDb } from '@/lib/db/provider';
+import { BarcodeScannerModal } from '@/components/barcode-scanner-modal';
 
 export default function AddProductModal() {
   const router = useRouter();
@@ -30,6 +31,7 @@ export default function AddProductModal() {
   const [openingStock, setOpeningStock] = useState('');
   const [minAlert, setMinAlert] = useState('10');
   const [saving, setSaving] = useState(false);
+  const [showScannerModal, setShowScannerModal] = useState(false);
 
   const cost = parseFloat(costPrice) || 0;
   const retail = parseFloat(retailPrice) || 0;
@@ -101,6 +103,15 @@ export default function AddProductModal() {
     setSku(`${prefix}-${randomNum}`);
   };
 
+  const handleBarcodeScanned = (code: string) => {
+    const clean = code.trim().toUpperCase();
+    if (clean) {
+      setSku(clean);
+      setShowScannerModal(false);
+      Alert.alert('Barcode Scanned', `SKU set to: ${clean}`);
+    }
+  };
+
   return (
     <View className="flex-1 bg-surface">
       {/* Top Header */}
@@ -145,7 +156,7 @@ export default function AddProductModal() {
               </View>
             </View>
             <Pressable
-              onPress={() => Alert.alert('Scanner Camera', 'Camera scanner ready')}
+              onPress={() => setShowScannerModal(true)}
               className="flex-row items-center gap-1.5 px-3 py-2 bg-primary rounded-lg active:bg-primaryContainer"
             >
               <AppIcon name="photo_camera" size={16} color="#ffffff" />
@@ -181,13 +192,22 @@ export default function AddProductModal() {
               <Text className="text-xs font-semibold text-onSurfaceVariant">
                 SKU / Product Code
               </Text>
-              <Pressable
-                onPress={handleAutoGenerateSku}
-                className="flex-row items-center gap-1"
-              >
-                <AppIcon name="auto_fix_high" size={13} color={colors.primary} />
-                <Text className="text-xs font-bold text-primary">Auto-Generate</Text>
-              </Pressable>
+              <View className="flex-row items-center gap-3">
+                <Pressable
+                  onPress={() => setShowScannerModal(true)}
+                  className="flex-row items-center gap-1"
+                >
+                  <AppIcon name="barcode_scanner" size={13} color={colors.primary} />
+                  <Text className="text-xs font-bold text-primary">Scan</Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleAutoGenerateSku}
+                  className="flex-row items-center gap-1"
+                >
+                  <AppIcon name="auto_fix_high" size={13} color={colors.secondary} />
+                  <Text className="text-xs font-bold text-secondary">Auto-Generate</Text>
+                </Pressable>
+              </View>
             </View>
             <View className="relative flex-row items-center">
               <TextInput
@@ -410,6 +430,14 @@ export default function AddProductModal() {
           </Text>
         </Pressable>
       </ScrollView>
+
+      <BarcodeScannerModal
+        visible={showScannerModal}
+        onClose={() => setShowScannerModal(false)}
+        onScan={handleBarcodeScanned}
+        title="Scan Carton or Item Barcode"
+        subtitle="Point camera at product barcode or EAN-13 code"
+      />
     </View>
   );
 }

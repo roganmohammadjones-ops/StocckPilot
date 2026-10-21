@@ -7,6 +7,7 @@ import { colors } from '@/lib/theme';
 import { getProducts } from '@/lib/db/queries';
 import type { Product } from '@/lib/db/types';
 import { useDataRefresh, useAppDb } from '@/lib/db/provider';
+import { BarcodeScannerModal } from '@/components/barcode-scanner-modal';
 
 export default function InventoryScreen() {
   const router = useRouter();
@@ -18,6 +19,7 @@ export default function InventoryScreen() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'low' | 'out'>('all');
   const [refreshing, setRefreshing] = useState(false);
+  const [showScannerModal, setShowScannerModal] = useState(false);
 
   const fetchItems = useCallback(async () => {
     try {
@@ -59,6 +61,14 @@ export default function InventoryScreen() {
       ? `₦${(totalValuation / 1000000).toFixed(2)}M`
       : `₦${totalValuation.toLocaleString()}`;
 
+  const handleBarcodeScanned = (code: string) => {
+    const term = code.trim();
+    if (term) {
+      setSearchQuery(term);
+      setShowScannerModal(false);
+    }
+  };
+
   return (
     <View className="flex-1 bg-surface">
       <AppHeader />
@@ -79,7 +89,7 @@ export default function InventoryScreen() {
             </View>
           </View>
           <Pressable
-            onPress={() => router.push('/modal/add-product')}
+            onPress={() => setShowScannerModal(true)}
             className="flex-row items-center gap-1 px-3.5 py-2 rounded-full bg-secondaryContainer shadow-sm active:scale-95"
           >
             <AppIcon name="barcode_scanner" size={17} color={colors.onSecondaryContainer} />
@@ -155,7 +165,7 @@ export default function InventoryScreen() {
             className="w-full h-11 pl-9 pr-11 bg-white rounded-xl border border-cardBorder text-sm text-onSurface shadow-xs"
           />
           <Pressable
-            onPress={() => router.push('/modal/add-product')}
+            onPress={() => setShowScannerModal(true)}
             className="absolute right-2 w-7 h-7 rounded-lg bg-surfaceContainer items-center justify-center active:bg-secondaryContainer"
           >
             <AppIcon name="barcode_scanner" size={17} color={colors.onSurface} />
@@ -429,6 +439,15 @@ export default function InventoryScreen() {
         </View>
       )}
       </ScrollView>
+
+      <BarcodeScannerModal
+        visible={showScannerModal}
+        onClose={() => setShowScannerModal(false)}
+        onScan={handleBarcodeScanned}
+        title="Scan Stock Barcode"
+        subtitle="Point camera at product carton or SKU tag to find it in catalog"
+        quickCodes={products.slice(0, 6).map((p) => p.sku)}
+      />
     </View>
   );
 }

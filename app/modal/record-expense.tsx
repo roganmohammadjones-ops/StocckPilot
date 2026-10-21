@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -24,8 +24,12 @@ export default function RecordExpenseModal() {
   const [amount, setAmount] = useState('');
   const [source, setSource] = useState<'till' | 'bank'>('till');
   const [description, setDescription] = useState('');
-  const [voucherNo, setVoucherNo] = useState(`EXP-${Math.floor(100 + Math.random() * 900)}`);
+  const [voucherNo, setVoucherNo] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    setVoucherNo(`EXP-${Date.now().toString().slice(-4)}`);
+  }, []);
 
   const categories = [
     { id: 'diesel', label: 'Generator & Diesel', icon: 'local_gas_station' },
@@ -182,7 +186,7 @@ export default function RecordExpenseModal() {
                   source === 'till' ? 'text-white/80' : 'text-onSurfaceVariant'
                 }`}
               >
-                Balance: ₦185,000
+                Cash Outflow
               </Text>
             </Pressable>
 

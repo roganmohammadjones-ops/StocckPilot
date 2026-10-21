@@ -9,9 +9,11 @@ import { useRouter } from 'expo-router';
 import { AppIcon } from '@/components/icon';
 import { BrandLogo } from '@/components/brand-logo';
 import { colors } from '@/lib/theme';
+import { useStoreProfile } from '@/lib/store-profile';
 
 export default function OrderReviewScreen() {
   const router = useRouter();
+  const store = useStoreProfile();
   const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'delivery'>('pickup');
 
   const subtotal = 108700;
@@ -186,7 +188,10 @@ export default function OrderReviewScreen() {
           onPress={() =>
             router.push({
               pathname: '/otp-verify',
-              params: { phone: '+234 803 491 8820', businessName: 'Wholesale Depot Order' },
+              params: {
+                phone: store.phone || '+234 800 000 0000',
+                businessName: store.businessName || 'Wholesale Depot Order',
+              },
             })
           }
           className="w-full h-12 rounded-xl bg-primary items-center justify-center flex-row gap-2 active:bg-secondary shadow-md"

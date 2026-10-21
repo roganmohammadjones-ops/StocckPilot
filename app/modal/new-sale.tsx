@@ -19,6 +19,7 @@ import { useDataRefresh, useAppDb } from '@/lib/db/provider';
 import type { Product, Customer } from '@/lib/db/types';
 import { printReceipt, shareReceiptPdf } from '@/lib/receipt';
 import { useStoreProfile } from '@/lib/store-profile';
+import { BarcodeScannerModal } from '@/components/barcode-scanner-modal';
 
 interface CartItem {
   id: string;
@@ -65,7 +66,6 @@ export default function NewSaleModal() {
   const [showAddSkuModal, setShowAddSkuModal] = useState(false);
   const [showBarcodeScannerModal, setShowBarcodeScannerModal] = useState(false);
   const [skuSearchQuery, setSkuSearchQuery] = useState('');
-  const [barcodeInput, setBarcodeInput] = useState('');
   const [completedSale, setCompletedSale] = useState<{
     invoiceNo: string;
     netPayable: number;
@@ -160,7 +160,6 @@ export default function NewSaleModal() {
 
     if (matched) {
       addItemToCart(matched);
-      setBarcodeInput('');
       setShowBarcodeScannerModal(false);
       Alert.alert('Item Added', `${matched.name} added to cart.`);
     } else {
@@ -796,81 +795,17 @@ export default function NewSaleModal() {
         </View>
       </Modal>
 
-      {/* Barcode Scanner Modal */}
-      <Modal
+      {/* 2. Live Hardware & Camera Barcode Scanner Modal */}
+      <BarcodeScannerModal
         visible={showBarcodeScannerModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowBarcodeScannerModal(false)}
-      >
-        <View className="flex-1 bg-black/60 justify-end">
-          <View className="bg-white rounded-t-3xl p-5 border-t border-cardBorder max-h-[85%]">
-            <View className="w-12 h-1 bg-outlineVariant rounded-full self-center mb-3" />
-
-            <View className="flex-row items-center justify-between mb-4">
-              <View>
-                <Text className="text-lg font-bold text-onSurface">Barcode / QR Scanner</Text>
-                <Text className="text-xs text-onSurfaceVariant">
-                  Point at SKU barcode or enter code directly
-                </Text>
-              </View>
-              <Pressable
-                onPress={() => setShowBarcodeScannerModal(false)}
-                className="w-8 h-8 rounded-full bg-surfaceContainer items-center justify-center"
-              >
-                <AppIcon name="close" size={18} color={colors.onSurfaceVariant} />
-              </Pressable>
-            </View>
-
-            {/* Scanner Viewfinder Box */}
-            <View className="w-full h-44 bg-surfaceContainerHighest rounded-2xl items-center justify-center border-2 border-dashed border-primary mb-4 relative overflow-hidden">
-              <AppIcon name="barcode_scanner" size={48} color={colors.primary} />
-              <Text className="text-xs font-bold text-onSurface mt-2">
-                Scanner Viewfinder Active
-              </Text>
-              <Text className="text-[10px] text-onSurfaceVariant">
-                Position barcode within frame
-              </Text>
-              <View className="absolute top-1/2 left-4 right-4 h-0.5 bg-error opacity-80" />
-            </View>
-
-            {/* Quick Barcode Testing Buttons */}
-            <Text className="text-xs font-semibold text-onSurfaceVariant mb-1.5">
-              Quick SKU Barcode Presets:
-            </Text>
-            <View className="flex-row flex-wrap gap-2 mb-4">
-              {['DNG-SUG-50', 'PEAK-CAN-48', 'SEMO-10KG', 'GINO-TOM-50', 'IND-SUP-40'].map(
-                (code) => (
-                  <Pressable
-                    key={code}
-                    onPress={() => handleScanBarcode(code)}
-                    className="px-2.5 py-1.5 bg-surfaceContainerLow border border-cardBorder rounded-lg active:bg-secondaryContainer"
-                  >
-                    <Text className="text-xs font-mono font-bold text-primary">{code}</Text>
-                  </Pressable>
-                )
-              )}
-            </View>
-
-            {/* Manual Code Input */}
-            <View className="flex-row items-center gap-2">
-              <TextInput
-                value={barcodeInput}
-                onChangeText={setBarcodeInput}
-                placeholder="Or type SKU code..."
-                placeholderTextColor={colors.outline}
-                className="flex-1 h-12 px-3 bg-surfaceContainerLow rounded-xl border border-cardBorder text-xs font-mono font-bold text-onSurface"
-              />
-              <Pressable
-                onPress={() => handleScanBarcode(barcodeInput)}
-                className="h-12 px-4 bg-primary rounded-xl items-center justify-center active:bg-primaryContainer"
-              >
-                <Text className="text-xs font-bold text-white">Scan SKU</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setShowBarcodeScannerModal(false)}
+        onScan={(code) => {
+          handleScanBarcode(code);
+        }}
+        title="Scan Product Barcode"
+        subtitle="Point camera at product carton or EAN tag"
+        quickCodes={products.slice(0, 6).map((p) => p.sku)}
+      />
 
       {/* 3. Sale Completion & Receipt Modal */}
       <Modal

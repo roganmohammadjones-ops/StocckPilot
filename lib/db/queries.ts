@@ -133,6 +133,55 @@ export async function updateProductStock(
   );
 }
 
+export async function upsertProduct(
+  db: SQLiteDatabase,
+  product: {
+    id: string;
+    name: string;
+    sku: string;
+    category: string;
+    categorySlug: string;
+    stockLeft: number;
+    stockUnit: string;
+    minAlert?: number;
+    costPrice: number;
+    sellingPrice: number;
+    wholesalePrice?: number;
+    recentNote?: string;
+  }
+): Promise<void> {
+  await db.runAsync(
+    `INSERT INTO products (id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, wholesale_price, recent_note)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       name = excluded.name,
+       sku = excluded.sku,
+       category = excluded.category,
+       category_slug = excluded.category_slug,
+       stock_left = excluded.stock_left,
+       stock_unit = excluded.stock_unit,
+       min_alert = excluded.min_alert,
+       cost_price = excluded.cost_price,
+       selling_price = excluded.selling_price,
+       wholesale_price = excluded.wholesale_price,
+       recent_note = excluded.recent_note`,
+    [
+      product.id,
+      product.name,
+      product.sku,
+      product.category,
+      product.categorySlug,
+      product.stockLeft,
+      product.stockUnit,
+      product.minAlert ?? 10,
+      product.costPrice,
+      product.sellingPrice,
+      product.wholesalePrice ?? null,
+      product.recentNote ?? null,
+    ]
+  );
+}
+
 // ==========================================
 // CUSTOMERS & DEBTORS QUERIES
 // ==========================================
@@ -235,6 +284,46 @@ export async function addCustomer(
   );
 
   return id;
+}
+
+export async function upsertCustomer(
+  db: SQLiteDatabase,
+  customer: {
+    id: string;
+    name: string;
+    phone?: string;
+    location?: string;
+    tier?: string;
+    isVerified?: boolean;
+    creditLimit?: number;
+    balance?: number;
+    dueText?: string;
+  }
+): Promise<void> {
+  await db.runAsync(
+    `INSERT INTO customers (id, name, phone, location, tier, is_verified, credit_limit, balance, due_text)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       name = excluded.name,
+       phone = excluded.phone,
+       location = excluded.location,
+       tier = excluded.tier,
+       is_verified = excluded.is_verified,
+       credit_limit = excluded.credit_limit,
+       balance = excluded.balance,
+       due_text = excluded.due_text`,
+    [
+      customer.id,
+      customer.name,
+      customer.phone ?? null,
+      customer.location ?? null,
+      customer.tier ?? 'Silver Tier',
+      customer.isVerified ? 1 : 0,
+      customer.creditLimit ?? 500000,
+      customer.balance ?? 0,
+      customer.dueText ?? 'Settled • All Cleared',
+    ]
+  );
 }
 
 export async function recordDebtPayment(

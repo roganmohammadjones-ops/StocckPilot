@@ -148,8 +148,8 @@ export default function SalesRegisterScreen() {
   };
 
   const handleShareReceiptWhatsApp = (tx: SaleRecord) => {
-    const text = `*BAMIDELE & SONS PROVISIONS*%0A` +
-      `Idumota Market, Block B, Lagos%0A` +
+    const text = `*${store.businessName.toUpperCase()}*%0A` +
+      `${store.marketLocation}${store.marketStall ? `, ${store.marketStall}` : ''}%0A` +
       `--------------------------------%0A` +
       `*Receipt:* #${tx.invoiceNo}%0A` +
       `*Customer:* ${tx.customerName || 'Walk-in Customer'}%0A` +

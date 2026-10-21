@@ -18,11 +18,13 @@ import { useDataRefresh, useAppDb } from '@/lib/db/provider';
 import { getFinancialReportData } from '@/lib/db/queries';
 import type { FinancialReportData } from '@/lib/db/types';
 import { shareFinancialReportPdf } from '@/lib/receipt';
+import { useStoreProfile } from '@/lib/store-profile';
 
 export default function ReportsScreen() {
   const router = useRouter();
   const db = useAppDb();
   const { refreshTrigger } = useDataRefresh();
+  const store = useStoreProfile();
 
   const [report, setReport] = useState<FinancialReportData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -70,7 +72,7 @@ export default function ReportsScreen() {
   const handleShareSummaryWhatsApp = () => {
     const message = `*StockPilot Daily Closeout Report*%0A` +
       `--------------------------------%0A` +
-      `*Store:* Bamidele & Sons Provisions%0A` +
+      `*Store:* ${encodeURIComponent(store.businessName)}%0A` +
       `*Gross Revenue:* ₦${grossSales.toLocaleString()} (${salesCount} orders)%0A` +
       `*Landed Profit:* ₦${grossProfit.toLocaleString()} (${grossMarginPct}% margin)%0A` +
       `*Shop Overhead:* ₦${totalExpenses.toLocaleString()}%0A` +

@@ -16,6 +16,7 @@ import { colors } from '@/lib/theme';
 import { useDataRefresh, useAppDb } from '@/lib/db/provider';
 import { getProducts, updateProductStock } from '@/lib/db/queries';
 import type { Product } from '@/lib/db/types';
+import { useStoreProfile } from '@/lib/store-profile';
 
 interface SellerStall {
   id: string;
@@ -32,13 +33,13 @@ interface SellerStall {
 const mockSellers: SellerStall[] = [
   {
     id: '1',
-    name: 'Bamidele & Sons Direct Depot',
+    name: 'Prime Commodities Direct Depot',
     market: 'Idumota Block B, Lagos',
     tier: 'Wholesale Tier 1',
     rating: '★ 4.9',
     tradeCount: '320+ verified trades',
     waybill: 'Same-day Waybill',
-    phone: '+2348034918820',
+    phone: '+2348030001122',
     skus: [
       { name: 'Dangote Sugar 50kg (Bag)', price: '₦74,500', numPrice: 74500, targetSku: 'DNG-SUG-50' },
       { name: 'Peak Milk Powder Carton (24x400g)', price: '₦34,200', numPrice: 34200, targetSku: 'PEAK-CAN-48' },
@@ -81,6 +82,7 @@ export default function ExploreSellersScreen() {
   const router = useRouter();
   const db = useAppDb();
   const { triggerRefresh } = useDataRefresh();
+  const store = useStoreProfile();
 
   const [search, setSearch] = useState('');
   const [selectedMarket, setSelectedMarket] = useState('All Markets');
@@ -163,13 +165,13 @@ export default function ExploreSellersScreen() {
 
     const poMessage = `*PURCHASE ORDER: WAYBILL REQUEST*%0A` +
       `--------------------------------%0A` +
-      `*To:* ${activeSeller.name}%0A` +
-      `*From:* Bamidele & Sons Provisions (Balogun Market, Lagos)%0A` +
-      `*Item:* ${skuItem.name}%0A` +
+      `*To:* ${encodeURIComponent(activeSeller.name)}%0A` +
+      `*From:* ${encodeURIComponent(store.businessName)} (${encodeURIComponent(store.marketLocation)})%0A` +
+      `*Item:* ${encodeURIComponent(skuItem.name)}%0A` +
       `*Quantity:* ${qty} units%0A` +
-      `*Gate Rate:* ${skuItem.price}%0A` +
+      `*Gate Rate:* ${encodeURIComponent(skuItem.price)}%0A` +
       `*Est. Total:* ₦${totalOrderCost}%0A` +
-      `*Waybill Term:* ${activeSeller.waybill}%0A` +
+      `*Waybill Term:* ${encodeURIComponent(activeSeller.waybill)}%0A` +
       `--------------------------------%0A` +
       `Kindly confirm dispatch timing and account details for transfer.`;
 

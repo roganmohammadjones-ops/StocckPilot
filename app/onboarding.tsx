@@ -219,12 +219,12 @@ export default function WelcomeOnboardingScreen() {
           <View className="p-4 rounded-2xl bg-surfaceContainer border border-cardBorder shadow-sm">
             <View className="flex-row items-center gap-3 mb-2.5">
               <View className="w-12 h-12 rounded-full bg-primary items-center justify-center shadow-sm">
-                <Text className="text-white font-extrabold text-base">AM</Text>
+                <Text className="text-white font-extrabold text-base">WM</Text>
               </View>
               <View className="flex-1 min-w-0">
-                <Text className="text-sm font-bold text-onSurface truncate">Alhaji Musa Sani</Text>
+                <Text className="text-sm font-bold text-onSurface truncate">Wholesale Provisions Depot</Text>
                 <Text className="text-xs text-onSurfaceVariant truncate">
-                  Musa & Sons Provisions, Idumota Market
+                  Balogun Commercial Market, Lagos
                 </Text>
                 <View className="flex-row items-center gap-0.5 mt-0.5">
                   {[1, 2, 3, 4, 5].map((i) => (

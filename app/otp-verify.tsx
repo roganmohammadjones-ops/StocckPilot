@@ -211,10 +211,10 @@ export default function OtpVerifyScreen() {
       const existing = getStoredUser();
       const updatedUser: UserProfile = {
         id: existing?.id || `usr_${Date.now()}`,
-        name: existing?.name || (params.businessName ? `${params.businessName} Admin` : 'Alhaji Musa Sani'),
+        name: existing?.name || (params.businessName ? `${params.businessName} Admin` : 'Store Manager'),
         phone: parsedPhone.displayPhone,
-        businessName: existing?.businessName || params.businessName || 'Musa & Sons Provisions Ltd',
-        tradeHub: existing?.tradeHub || 'Idumota Wholesale Hub, Lagos',
+        businessName: existing?.businessName || params.businessName || 'My Wholesale Depot',
+        tradeHub: existing?.tradeHub || 'Commercial Market Hub, Lagos',
         role: existing?.role || 'merchant',
         isDemo: false,
       };

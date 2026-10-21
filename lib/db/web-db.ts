@@ -468,7 +468,7 @@ class WebDatabaseImpl implements AppDatabase {
 
     // 1. INSERT INTO products
     if (s.startsWith('INSERT INTO products') || s.startsWith('INSERT OR REPLACE INTO products')) {
-      const [id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, recent_note] = params;
+      const [id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, wholesale_price, recent_note] = params;
       this.data.products = this.data.products.filter(p => p.id !== id && p.sku !== sku);
       this.data.products.unshift({
         id,
@@ -481,7 +481,7 @@ class WebDatabaseImpl implements AppDatabase {
         min_alert: Number(min_alert),
         cost_price: Number(cost_price),
         selling_price: Number(selling_price),
-        wholesale_price: null,
+        wholesale_price: wholesale_price != null ? Number(wholesale_price) : null,
         recent_note: recent_note || null,
         created_at: new Date().toISOString(),
       });
@@ -502,8 +502,9 @@ class WebDatabaseImpl implements AppDatabase {
     }
 
     // 3. INSERT INTO customers
-    if (s.startsWith('INSERT INTO customers')) {
+    if (s.startsWith('INSERT INTO customers') || s.startsWith('INSERT OR REPLACE INTO customers')) {
       const [id, name, phone, location, tier, is_verified, credit_limit, balance, due_text] = params;
+      this.data.customers = this.data.customers.filter(c => c.id !== id);
       this.data.customers.unshift({
         id,
         name,

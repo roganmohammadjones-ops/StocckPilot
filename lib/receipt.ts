@@ -3,6 +3,7 @@ import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 import type { SaleRecord, Customer, FinancialReportData } from './db/types';
 import { getStoredUser } from './auth';
+import { getStoreProfile } from './store-profile';
 
 export interface ReceiptItem {
   productName: string;
@@ -33,9 +34,10 @@ export function generateReceiptHtml(
   store?: StoreDetails
 ): string {
   const user = getStoredUser();
-  const businessName = store?.businessName || user?.businessName || 'Bamidele & Sons Provisions Ltd';
-  const tradeHub = store?.tradeHub || user?.tradeHub || 'Idumota Wholesale Market, Lagos';
-  const phone = store?.phone || user?.phone || '+234 803 491 8820';
+  const profile = getStoreProfile();
+  const businessName = store?.businessName || profile.businessName || user?.businessName || 'StockPilot Store';
+  const tradeHub = store?.tradeHub || profile.marketLocation || user?.tradeHub || 'Lagos, Nigeria';
+  const phone = store?.phone || profile.phone || user?.phone || '';
   const cashier = store?.cashierName || 'Counter Till #1';
   const dateStr = sale.createdAt
     ? new Date(sale.createdAt).toLocaleString('en-NG', {
@@ -367,9 +369,10 @@ export function generatePaymentReceiptHtml(
   voucherNo?: string
 ): string {
   const user = getStoredUser();
-  const businessName = user?.businessName || 'Bamidele & Sons Provisions Ltd';
-  const tradeHub = user?.tradeHub || 'Idumota Wholesale Market, Lagos';
-  const phone = user?.phone || '+234 803 491 8820';
+  const profile = getStoreProfile();
+  const businessName = profile.businessName || user?.businessName || 'StockPilot Store';
+  const tradeHub = profile.marketLocation || user?.tradeHub || 'Lagos, Nigeria';
+  const phone = profile.phone || user?.phone || '';
   const vNo = voucherNo || `PAY-${Math.floor(1000 + Math.random() * 9000)}`;
   const dateStr = new Date().toLocaleString('en-NG', {
     day: '2-digit',
@@ -520,9 +523,10 @@ export function generateStatementHtml(
   transactions: SaleRecord[]
 ): string {
   const user = getStoredUser();
-  const businessName = user?.businessName || 'Bamidele & Sons Provisions Ltd';
-  const tradeHub = user?.tradeHub || 'Idumota Wholesale Market, Lagos';
-  const phone = user?.phone || '+234 803 491 8820';
+  const profile = getStoreProfile();
+  const businessName = profile.businessName || user?.businessName || 'StockPilot Store';
+  const tradeHub = profile.marketLocation || user?.tradeHub || 'Lagos, Nigeria';
+  const phone = profile.phone || user?.phone || '';
 
   const rowsHtml = transactions
     .map(
@@ -652,8 +656,9 @@ export function generateFinancialReportHtml(
   rangeName: string
 ): string {
   const user = getStoredUser();
-  const businessName = user?.businessName || 'Bamidele & Sons Provisions Ltd';
-  const tradeHub = user?.tradeHub || 'Idumota Wholesale Market, Lagos';
+  const profile = getStoreProfile();
+  const businessName = profile.businessName || user?.businessName || 'StockPilot Store';
+  const tradeHub = profile.marketLocation || user?.tradeHub || 'Lagos, Nigeria';
   const dateStr = new Date().toLocaleDateString('en-NG', {
     day: '2-digit',
     month: 'long',

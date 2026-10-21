@@ -16,9 +16,9 @@ import { loginWithCredentials, loginWithDemo } from '@/lib/auth';
 export default function LoginScreen() {
   const router = useRouter();
   const [authMode, setAuthMode] = useState<'phone' | 'email'>('phone');
-  const [phone, setPhone] = useState('08034918820');
-  const [email, setEmail] = useState('musa.provisions@stockpilot.ng');
-  const [password, setPassword] = useState('pilot1234');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -213,55 +213,41 @@ export default function LoginScreen() {
         <View className="flex-row items-center gap-3 mb-4">
           <View className="flex-1 h-px bg-cardBorder" />
           <Text className="text-xs font-bold text-onSurfaceVariant uppercase tracking-wider">
-            Or One-Tap Demo Access
+            Quick Exploration
           </Text>
           <View className="flex-1 h-px bg-cardBorder" />
         </View>
 
-        {/* Demo Buttons */}
-        <View className="gap-2.5 mb-6">
+        {/* Quick Access Buttons */}
+        <View className="flex-row gap-3 mb-6">
           <Pressable
             onPress={() => handleQuickDemo('merchant')}
-            className="p-3.5 rounded-xl bg-white border border-cardBorder flex-row items-center justify-between active:bg-surfaceContainer shadow-sm"
+            className="flex-1 p-3.5 rounded-xl bg-white border border-cardBorder items-center justify-center active:bg-surfaceContainer shadow-sm"
           >
-            <View className="flex-row items-center gap-3 flex-1 min-w-0 mr-2">
-              <View className="w-10 h-10 rounded-xl bg-secondaryContainer items-center justify-center">
-                <AppIcon name="warehouse" size={20} color={colors.secondary} />
-              </View>
-              <View className="flex-1 min-w-0">
-                <Text className="text-xs font-bold text-onSurface truncate">
-                  Alhaji Musa Sani (Provisions Merchant)
-                </Text>
-                <Text className="text-[11px] text-onSurfaceVariant truncate">
-                  Idumota Wholesale Depot • ₦1.4M Daily Sales
-                </Text>
-              </View>
+            <View className="w-10 h-10 rounded-xl bg-secondaryContainer items-center justify-center mb-1.5">
+              <AppIcon name="warehouse" size={20} color={colors.secondary} />
             </View>
-            <View className="px-2 py-1 rounded bg-secondaryContainer">
-              <Text className="text-[10px] font-bold text-onSecondaryContainer">Quick Test</Text>
-            </View>
+            <Text className="text-xs font-bold text-onSurface">
+              Merchant Mode
+            </Text>
+            <Text className="text-[10px] text-onSurfaceVariant mt-0.5">
+              Store & Till Workspace
+            </Text>
           </Pressable>
 
           <Pressable
             onPress={() => handleQuickDemo('buyer')}
-            className="p-3.5 rounded-xl bg-white border border-cardBorder flex-row items-center justify-between active:bg-surfaceContainer shadow-sm"
+            className="flex-1 p-3.5 rounded-xl bg-white border border-cardBorder items-center justify-center active:bg-surfaceContainer shadow-sm"
           >
-            <View className="flex-row items-center gap-3 flex-1 min-w-0 mr-2">
-              <View className="w-10 h-10 rounded-xl bg-surfaceContainerHigh items-center justify-center">
-                <AppIcon name="shopping_bag" size={20} color={colors.tertiary} />
-              </View>
-              <View className="flex-1 min-w-0">
-                <Text className="text-xs font-bold text-onSurface truncate">
-                  TopChoice Bulk Buyer
-                </Text>
-                <Text className="text-[11px] text-onSurfaceVariant truncate">
-                  Trade Fair Wholesale Hub • Explore Market Stalls
-                </Text>
-              </View>
+            <View className="w-10 h-10 rounded-xl bg-surfaceContainerHigh items-center justify-center mb-1.5">
+              <AppIcon name="shopping_bag" size={20} color={colors.tertiary} />
             </View>
-            <View className="px-2 py-1 rounded bg-surfaceContainer">
-              <Text className="text-[10px] font-bold text-onSurface">Buyer Mode</Text>
-            </View>
+            <Text className="text-xs font-bold text-onSurface">
+              Buyer Mode
+            </Text>
+            <Text className="text-[10px] text-onSurfaceVariant mt-0.5">
+              Marketplace & Catalog
+            </Text>
           </Pressable>
         </View>
 

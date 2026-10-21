@@ -79,6 +79,9 @@ const iconNameMap: Record<string, keyof typeof MaterialIcons.glyphMap> = {
   refresh: 'refresh',
   check: 'check',
   message: 'message',
+  flash_on: 'flash-on',
+  flip_camera_ios: 'flip-camera-ios',
+  camera_alt: 'camera-alt',
 };
 
 interface IconProps {
