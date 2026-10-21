@@ -1,0 +1,120 @@
+name: Production Release & Web Deploy
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  build-apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Native Android Project (CNG)
+        run: npx expo prebuild --platform android --clean
+        env:
+          EXPO_NO_TELEMETRY: '1'
+
+      - name: Build Android Release APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Prepare APK for Release
+        run: |
+          mkdir -p build-artifacts
+          APK_PATH=$(find android/app/build/outputs/apk -name "*.apk" | head -n 1)
+          echo "Found APK at: $APK_PATH"
+          cp "$APK_PATH" build-artifacts/StockPilot-Nigeria-v1.0.0.apk
+          ls -la build-artifacts/
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StockPilot-Nigeria-APK
+          path: build-artifacts/StockPilot-Nigeria-v1.0.0.apk
+
+      - name: Publish GitHub Release with APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.0' }}
+          name: "StockPilot Nigeria Production v1.0.0"
+          body: |
+            ## StockPilot Nigeria Production Release
+
+            Offline-first FMCG inventory, POS sales till, and B2B wholesale marketplace for Nigeria's open-market commercial corridors.
+
+            ### 📦 Release Features:
+            - **Point of Sale (POS)**: Fast till checkout for walk-in & registered customers with Cash, Bank Transfer, Moniepoint POS, and Credit ledger options.
+            - **Offline-First SQLite**: Local transactions, instant stock balance recalculations, and sales records with 100% offline uptime.
+            - **Wholesale Depot Network**: Direct warehouse replenishment, supplier order generation, and WhatsApp PO integration.
+            - **Profit & Loss Analytics**: Real-time margin tracking and turnover metrics.
+
+            ### 📱 Download & Install:
+            Download **`StockPilot-Nigeria-v1.0.0.apk`** below to install directly on your Android phone or terminal.
+          files: build-artifacts/StockPilot-Nigeria-v1.0.0.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-web:
+    name: Build & Export Expo Web
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Export Expo Web Bundle
+        run: npx expo export -p web
+        env:
+          EXPO_NO_TELEMETRY: '1'
+
+      - name: Upload Web Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StockPilot-Web-Production
+          path: dist/

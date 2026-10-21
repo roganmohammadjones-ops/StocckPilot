@@ -84,6 +84,18 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
       payment_method TEXT DEFAULT 'cash',
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS shifts (
+      id TEXT PRIMARY KEY,
+      cashier_name TEXT NOT NULL,
+      opened_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      closed_at TEXT,
+      expected_cash REAL NOT NULL DEFAULT 0,
+      counted_cash REAL,
+      discrepancy REAL,
+      notes TEXT,
+      status TEXT DEFAULT 'open'
+    );
   `);
 
   const productCount = await db.getFirstAsync<{ count: number }>(

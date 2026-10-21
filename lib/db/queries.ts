@@ -7,6 +7,7 @@ import type {
   ExpenseRecord,
   DashboardMetrics,
   FinancialReportData,
+  ShiftRecord,
 } from './types';
 
 // ==========================================
@@ -655,5 +656,120 @@ export async function getFinancialReportData(
     })),
   };
 }
+
+// ==========================================
+// SHIFT & CASH DRAWER RECONCILIATION QUERIES
+// ==========================================
+
+export async function getCurrentShift(
+  db: SQLiteDatabase
+): Promise<ShiftRecord> {
+  interface ShiftRow {
+    id: string;
+    cashier_name: string;
+    opened_at: string;
+    closed_at: string | null;
+    expected_cash: number;
+    counted_cash: number | null;
+    discrepancy: number | null;
+    notes: string | null;
+    status: 'open' | 'closed';
+  }
+
+  const row = await db.getFirstAsync<ShiftRow>(
+    `SELECT * FROM shifts WHERE status = 'open' ORDER BY opened_at DESC LIMIT 1`
+  );
+
+  if (row) {
+    // Dynamically calculate expected cash from cash sales minus cash expenses
+    const cashSales = await db.getFirstAsync<{ total: number | null }>(
+      `SELECT SUM(net_payable) as total FROM sales WHERE payment_channel = 'cash'`
+    );
+    const cashExpenses = await db.getFirstAsync<{ total: number | null }>(
+      `SELECT SUM(amount) as total FROM expenses WHERE payment_method = 'cash'`
+    );
+
+    const netCashInDrawer = (cashSales?.total ?? 0) - (cashExpenses?.total ?? 0);
+
+    return {
+      id: row.id,
+      cashierName: row.cashier_name,
+      openedAt: row.opened_at,
+      closedAt: row.closed_at ?? undefined,
+      expectedCash: Math.max(0, netCashInDrawer),
+      countedCash: row.counted_cash ?? undefined,
+      discrepancy: row.discrepancy ?? undefined,
+      notes: row.notes ?? undefined,
+      status: row.status,
+    };
+  }
+
+  // Create default initial open shift if none exists
+  const newId = `shift_${Date.now()}`;
+  const now = new Date().toISOString();
+  await db.runAsync(
+    `INSERT INTO shifts (id, cashier_name, opened_at, expected_cash, status)
+     VALUES (?, ?, ?, ?, ?)`,
+    [newId, 'Attendant Tunde', now, 0, 'open']
+  );
+
+  return {
+    id: newId,
+    cashierName: 'Attendant Tunde',
+    openedAt: now,
+    expectedCash: 0,
+    status: 'open',
+  };
+}
+
+export async function closeShift(
+  db: SQLiteDatabase,
+  shiftId: string,
+  countedCash: number,
+  expectedCash: number,
+  notes: string = ''
+): Promise<void> {
+  const discrepancy = countedCash - expectedCash;
+  const closedAt = new Date().toISOString();
+
+  await db.runAsync(
+    `UPDATE shifts
+     SET closed_at = ?,
+         expected_cash = ?,
+         counted_cash = ?,
+         discrepancy = ?,
+         notes = ?,
+         status = 'closed'
+     WHERE id = ?`,
+    [closedAt, expectedCash, countedCash, discrepancy, notes, shiftId]
+  );
+}
+
+export async function openNewShift(
+  db: SQLiteDatabase,
+  cashierName: string = 'Attendant Tunde'
+): Promise<ShiftRecord> {
+  // 1. Close any lingering open shifts
+  await db.runAsync(`UPDATE shifts SET status = 'closed' WHERE status = 'open'`);
+
+  // 2. Open new shift
+  const newId = `shift_${Date.now()}`;
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    `INSERT INTO shifts (id, cashier_name, opened_at, expected_cash, status)
+     VALUES (?, ?, ?, ?, ?)`,
+    [newId, cashierName, now, 0, 'open']
+  );
+
+  return {
+    id: newId,
+    cashierName,
+    openedAt: now,
+    expectedCash: 0,
+    status: 'open',
+  };
+}
+
 
 

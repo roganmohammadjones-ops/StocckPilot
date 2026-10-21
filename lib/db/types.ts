@@ -118,4 +118,17 @@ export interface FinancialReportData {
   }[];
 }
 
+export interface ShiftRecord {
+  id: string;
+  cashierName: string;
+  openedAt: string;
+  closedAt?: string;
+  expectedCash: number;
+  countedCash?: number;
+  discrepancy?: number;
+  notes?: string;
+  status: 'open' | 'closed';
+}
+
+
 

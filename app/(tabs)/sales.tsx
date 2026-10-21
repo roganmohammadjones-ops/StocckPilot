@@ -8,6 +8,8 @@ import {
   Modal,
   Linking,
   Alert,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -15,8 +17,24 @@ import { AppHeader } from '@/components/app-header';
 import { AppIcon } from '@/components/icon';
 import { colors } from '@/lib/theme';
 import { useDataRefresh } from '@/lib/db/provider';
-import { getSales, getDashboardMetrics } from '@/lib/db/queries';
-import type { SaleRecord, DashboardMetrics } from '@/lib/db/types';
+import {
+  getSales,
+  getDashboardMetrics,
+  getCurrentShift,
+  closeShift,
+  openNewShift,
+} from '@/lib/db/queries';
+import type { SaleRecord, DashboardMetrics, ShiftRecord } from '@/lib/db/types';
+
+function formatShiftTime(isoString?: string): string {
+  if (!isoString) return 'Just now';
+  try {
+    const d = new Date(isoString);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return isoString;
+  }
+}
 
 export default function SalesRegisterScreen() {
   const router = useRouter();
@@ -26,17 +44,27 @@ export default function SalesRegisterScreen() {
   const [selectedRange, setSelectedRange] = useState<'today' | 'yesterday' | 'week'>('today');
   const [sales, setSales] = useState<SaleRecord[]>([]);
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [currentShift, setCurrentShift] = useState<ShiftRecord | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<SaleRecord | null>(null);
 
+  // Shift Closeout & Drawer Reconciliation
+  const [showShiftModal, setShowShiftModal] = useState(false);
+  const [countedCashInput, setCountedCashInput] = useState('');
+  const [nextCashierInput, setNextCashierInput] = useState('');
+  const [shiftNotes, setShiftNotes] = useState('');
+  const [isReconciling, setIsReconciling] = useState(false);
+
   const loadSalesData = useCallback(async () => {
     try {
-      const [salesList, dashMetrics] = await Promise.all([
+      const [salesList, dashMetrics, activeShift] = await Promise.all([
         getSales(db, 30),
         getDashboardMetrics(db),
+        getCurrentShift(db),
       ]);
       setSales(salesList);
       setMetrics(dashMetrics);
+      setCurrentShift(activeShift);
     } catch (e) {
       console.error('Failed to load sales register', e);
     }
@@ -66,6 +94,54 @@ export default function SalesRegisterScreen() {
   const cashPct = Math.round((cashTotal / totalChannels) * 100);
   const transferPct = Math.round((transferTotal / totalChannels) * 100);
   const creditPct = Math.max(0, 100 - cashPct - transferPct);
+
+  const expectedCash = currentShift?.expectedCash ?? 0;
+  const countedCash = parseFloat(countedCashInput.replace(/,/g, '')) || 0;
+  const discrepancy = countedCash - expectedCash;
+
+  const addCashIncrement = (amount: number) => {
+    const current = parseFloat(countedCashInput.replace(/,/g, '')) || 0;
+    setCountedCashInput((current + amount).toString());
+  };
+
+  const handleOpenShiftModal = () => {
+    if (currentShift) {
+      setCountedCashInput(currentShift.expectedCash > 0 ? currentShift.expectedCash.toString() : '');
+      setNextCashierInput(currentShift.cashierName);
+      setShiftNotes('');
+      setShowShiftModal(true);
+    }
+  };
+
+  const handleReconcileShift = async () => {
+    if (!currentShift) return;
+    setIsReconciling(true);
+    try {
+      await closeShift(
+        db,
+        currentShift.id,
+        countedCash,
+        expectedCash,
+        shiftNotes.trim()
+      );
+
+      const nextCashier = nextCashierInput.trim() || currentShift.cashierName;
+      const newShift = await openNewShift(db, nextCashier);
+      setCurrentShift(newShift);
+      setShowShiftModal(false);
+
+      await loadSalesData();
+
+      Alert.alert(
+        'Shift Closed & Drawer Reconciled',
+        `Till Shift Summary:\n• Cashier: ${currentShift.cashierName}\n• Expected Cash: ₦${expectedCash.toLocaleString()}\n• Counted Cash: ₦${countedCash.toLocaleString()}\n• Discrepancy: ${discrepancy >= 0 ? '+' : ''}₦${discrepancy.toLocaleString()}\n\nNext shift active for ${nextCashier}.`
+      );
+    } catch (e: any) {
+      Alert.alert('Reconciliation Error', e?.message || 'Failed to close shift.');
+    } finally {
+      setIsReconciling(false);
+    }
+  };
 
   const handleShareReceiptWhatsApp = (tx: SaleRecord) => {
     const text = `*BAMIDELE & SONS PROVISIONS*%0A` +
@@ -100,12 +176,17 @@ export default function SalesRegisterScreen() {
               <AppIcon name="analytics" size={20} color={colors.primary} />
               <Text className="text-base font-bold text-onSurface">Daily Register Pulse</Text>
             </View>
-            <View className="flex-row items-center gap-1 px-2.5 py-0.5 rounded-full bg-secondaryContainer/50">
+            <Pressable
+              onPress={handleOpenShiftModal}
+              className="flex-row items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondaryContainer/80 border border-secondary active:opacity-70"
+            >
+              <View className="w-2 h-2 rounded-full bg-primary" />
               <AppIcon name="lock_clock" size={13} color={colors.onSecondaryContainer} />
-              <Text className="text-xs font-semibold text-onSecondaryContainer">
-                Shift #1 Open
+              <Text className="text-xs font-bold text-onSecondaryContainer">
+                {currentShift?.cashierName ? `${currentShift.cashierName} • Shift Open` : 'Shift Open'}
               </Text>
-            </View>
+              <AppIcon name="expand_more" size={14} color={colors.onSecondaryContainer} />
+            </Pressable>
           </View>
 
           {/* Metric Readout */}
@@ -201,7 +282,7 @@ export default function SalesRegisterScreen() {
           {/* Quick Expense Outflow Link */}
           <Pressable
             onPress={() => router.push('/modal/record-expense')}
-            className="bg-surfaceContainerHigh/60 rounded-xl p-3 flex-row items-center justify-between active:opacity-80"
+            className="bg-surfaceContainerHigh/60 rounded-xl p-3 flex-row items-center justify-between active:opacity-80 mb-2"
           >
             <View className="flex-row items-center gap-2.5 flex-1 mr-2">
               <View className="w-9 h-9 rounded-lg bg-secondaryContainer items-center justify-center">
@@ -217,6 +298,31 @@ export default function SalesRegisterScreen() {
               </View>
             </View>
             <AppIcon name="arrow_forward" size={16} color={colors.primary} />
+          </Pressable>
+
+          {/* End-of-Day Shift Closeout & Drawer Reconciliation Link */}
+          <Pressable
+            onPress={handleOpenShiftModal}
+            className="bg-secondaryContainer/40 border border-secondary/30 rounded-xl p-3 flex-row items-center justify-between active:opacity-80"
+          >
+            <View className="flex-row items-center gap-2.5 flex-1 mr-2">
+              <View className="w-9 h-9 rounded-lg bg-secondaryContainer items-center justify-center">
+                <AppIcon name="lock_clock" size={18} color={colors.onSecondaryContainer} />
+              </View>
+              <View className="flex-1 min-w-0">
+                <Text className="text-xs font-bold text-onSurface truncate">
+                  End-of-Day Shift Closeout & Cash Drawer
+                </Text>
+                <Text className="text-[11px] text-onSurfaceVariant truncate">
+                  Count drawer cash, balance overage/shortage & handover
+                </Text>
+              </View>
+            </View>
+            <View className="px-2 py-0.5 rounded bg-secondaryContainer">
+              <Text className="text-[10px] font-bold text-onSecondaryContainer uppercase">
+                Reconcile
+              </Text>
+            </View>
           </Pressable>
         </View>
 
@@ -460,6 +566,184 @@ export default function SalesRegisterScreen() {
                 <AppIcon name="close" size={20} color={colors.onSurfaceVariant} />
               </Pressable>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 4. End-of-Day Shift Closeout Modal */}
+      <Modal
+        visible={showShiftModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowShiftModal(false)}
+      >
+        <View className="flex-1 bg-black/60 justify-end">
+          <View className="bg-white rounded-t-3xl max-h-[90%] p-5 border-t border-cardBorder shadow-2xl">
+            {/* Modal Header */}
+            <View className="flex-row items-center justify-between pb-3 border-b border-cardBorder mb-4">
+              <View>
+                <Text className="text-base font-bold text-onSurface">Till Shift Closeout</Text>
+                <Text className="text-xs text-onSurfaceVariant">
+                  {currentShift?.cashierName || 'Attendant'} • Opened {formatShiftTime(currentShift?.openedAt)}
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => setShowShiftModal(false)}
+                className="w-8 h-8 rounded-full bg-surfaceContainerLow items-center justify-center"
+              >
+                <AppIcon name="close" size={18} color={colors.onSurfaceVariant} />
+              </Pressable>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {/* Expected Drawer Cash */}
+              <View className="bg-surfaceContainerLow p-4 rounded-2xl mb-4 border border-cardBorder">
+                <Text className="text-xs font-semibold text-onSurfaceVariant mb-1">
+                  Expected Cash in Drawer
+                </Text>
+                <Text className="text-2xl font-bold text-onSurface">
+                  ₦{expectedCash.toLocaleString()}
+                  <Text className="text-sm font-normal text-onSurfaceVariant">.00</Text>
+                </Text>
+                <Text className="text-[11px] text-outline mt-1">
+                  System balance calculated from total cash sales minus shop cash expenses.
+                </Text>
+              </View>
+
+              {/* Physical Count Input */}
+              <View className="mb-4">
+                <Text className="text-xs font-bold text-onSurface mb-1.5">
+                  Counted Physical Cash (₦)
+                </Text>
+                <TextInput
+                  value={countedCashInput}
+                  onChangeText={setCountedCashInput}
+                  keyboardType="numeric"
+                  placeholder="Enter counted cash in till"
+                  placeholderTextColor={colors.onSurfaceVariant}
+                  className="w-full h-12 bg-surfaceContainerLow border border-cardBorder rounded-xl px-4 text-base font-bold text-onSurface"
+                />
+
+                {/* Quick Denomination Chips */}
+                <View className="flex-row flex-wrap gap-1.5 mt-2.5">
+                  {[10000, 5000, 1000, 500].map((amt) => (
+                    <Pressable
+                      key={amt}
+                      onPress={() => addCashIncrement(amt)}
+                      className="px-2.5 py-1 bg-surfaceContainer rounded-lg border border-cardBorder active:bg-secondaryContainer"
+                    >
+                      <Text className="text-xs font-semibold text-onSurface">
+                        +₦{amt.toLocaleString()}
+                      </Text>
+                    </Pressable>
+                  ))}
+                  <Pressable
+                    onPress={() => setCountedCashInput(expectedCash.toString())}
+                    className="px-2.5 py-1 bg-primary/10 rounded-lg active:bg-primary/20"
+                  >
+                    <Text className="text-xs font-bold text-primary">Match Expected</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setCountedCashInput('0')}
+                    className="px-2.5 py-1 bg-surfaceContainerHigh rounded-lg"
+                  >
+                    <Text className="text-xs font-semibold text-onSurfaceVariant">Clear</Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* Discrepancy Status Banner */}
+              <View
+                className={`p-3.5 rounded-xl mb-4 border ${
+                  discrepancy === 0
+                    ? 'bg-secondaryContainer/50 border-secondary'
+                    : discrepancy > 0
+                    ? 'bg-primary/10 border-primary'
+                    : 'bg-errorContainer/60 border-error'
+                }`}
+              >
+                <View className="flex-row items-center justify-between mb-0.5">
+                  <Text className="text-xs font-bold text-onSurface">Reconciliation Status</Text>
+                  <Text
+                    className={`text-xs font-bold ${
+                      discrepancy === 0
+                        ? 'text-onSecondaryContainer'
+                        : discrepancy > 0
+                        ? 'text-primary'
+                        : 'text-error'
+                    }`}
+                  >
+                    {discrepancy === 0
+                      ? 'Balanced (₦0.00)'
+                      : discrepancy > 0
+                      ? `+₦${discrepancy.toLocaleString()} Overage`
+                      : `-₦${Math.abs(discrepancy).toLocaleString()} Shortage`}
+                  </Text>
+                </View>
+                <Text className="text-[11px] text-onSurfaceVariant">
+                  {discrepancy === 0
+                    ? 'Drawer physically matches the register ledger exactly.'
+                    : discrepancy > 0
+                    ? 'Physical cash exceeds system calculation (extra cash in drawer).'
+                    : 'Physical cash is lower than system calculation (cash missing or unrecorded expense).'}
+                </Text>
+              </View>
+
+              {/* Handover Next Attendant */}
+              <View className="mb-4">
+                <Text className="text-xs font-bold text-onSurface mb-1.5">
+                  Next Shift Cashier Name
+                </Text>
+                <TextInput
+                  value={nextCashierInput}
+                  onChangeText={setNextCashierInput}
+                  placeholder="e.g. Attendant Chioma"
+                  placeholderTextColor={colors.onSurfaceVariant}
+                  className="w-full h-11 bg-surfaceContainerLow border border-cardBorder rounded-xl px-3 text-xs font-medium text-onSurface"
+                />
+              </View>
+
+              {/* Shift Notes */}
+              <View className="mb-5">
+                <Text className="text-xs font-bold text-onSurface mb-1.5">
+                  Reconciliation Notes (Optional)
+                </Text>
+                <TextInput
+                  value={shiftNotes}
+                  onChangeText={setShiftNotes}
+                  placeholder="e.g. ₦200 shortage due to damaged note"
+                  placeholderTextColor={colors.onSurfaceVariant}
+                  className="w-full h-11 bg-surfaceContainerLow border border-cardBorder rounded-xl px-3 text-xs font-medium text-onSurface"
+                />
+              </View>
+
+              {/* Action Buttons */}
+              <View className="flex-row gap-2.5 mb-6">
+                <Pressable
+                  onPress={handleReconcileShift}
+                  disabled={isReconciling}
+                  className={`flex-1 h-12 rounded-xl flex-row items-center justify-center gap-2 ${
+                    isReconciling ? 'bg-primary/70' : 'bg-primary active:bg-primaryContainer'
+                  }`}
+                >
+                  {isReconciling ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <AppIcon name="lock" size={18} color="#ffffff" />
+                  )}
+                  <Text className="text-xs font-bold text-white">
+                    {isReconciling ? 'Closing Shift...' : 'Close & Open Next Shift'}
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => setShowShiftModal(false)}
+                  className="px-4 h-12 rounded-xl bg-surfaceContainer items-center justify-center"
+                >
+                  <Text className="text-xs font-semibold text-onSurfaceVariant">Cancel</Text>
+                </Pressable>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>

@@ -1,12 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, ScrollView, Pressable, Alert, ActivityIndicator } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { AppHeader } from '@/components/app-header';
 import { AppIcon } from '@/components/icon';
 import { colors } from '@/lib/theme';
+import { syncDatabaseWithCloud } from '@/lib/db/sync';
 
 export default function SettingsScreen() {
   const db = useSQLiteContext();
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [stats, setStats] = useState({
     products: 0,
     customers: 0,
@@ -14,34 +17,46 @@ export default function SettingsScreen() {
     expenses: 0,
   });
 
-  useEffect(() => {
-    async function loadStats() {
-      try {
-        const [prodRow, custRow, saleRow, expRow] = await Promise.all([
-          db.getFirstAsync<{ count: number }>('SELECT count(*) as count FROM products'),
-          db.getFirstAsync<{ count: number }>('SELECT count(*) as count FROM customers'),
-          db.getFirstAsync<{ count: number }>('SELECT count(*) as count FROM sales'),
-          db.getFirstAsync<{ count: number }>('SELECT count(*) as count FROM expenses'),
-        ]);
+  const loadStats = useCallback(async () => {
+    try {
+      const [prodRow, custRow, saleRow, expRow] = await Promise.all([
+        db.getFirstAsync<{ count: number }>('SELECT count(*) as count FROM products'),
+        db.getFirstAsync<{ count: number }>('SELECT count(*) as count FROM customers'),
+        db.getFirstAsync<{ count: number }>('SELECT count(*) as count FROM sales'),
+        db.getFirstAsync<{ count: number }>('SELECT count(*) as count FROM expenses'),
+      ]);
 
-        setStats({
-          products: prodRow?.count ?? 0,
-          customers: custRow?.count ?? 0,
-          sales: saleRow?.count ?? 0,
-          expenses: expRow?.count ?? 0,
-        });
-      } catch (e) {
-        console.error('Failed to load settings stats:', e);
-      }
+      setStats({
+        products: prodRow?.count ?? 0,
+        customers: custRow?.count ?? 0,
+        sales: saleRow?.count ?? 0,
+        expenses: expRow?.count ?? 0,
+      });
+    } catch (e) {
+      console.error('Failed to load settings stats:', e);
     }
-    loadStats();
   }, [db]);
 
-  const handleBackup = () => {
-    Alert.alert(
-      'Encrypted Local Backup Complete',
-      `All records safely committed to local SQLite (stockpilot.db):\n• ${stats.products} Products / SKUs\n• ${stats.customers} Customers in Ledger\n• ${stats.sales} Sales Invoices\n• ${stats.expenses} Expense Entries\n\nReady for cloud mirror when online network connects.`
-    );
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
+
+  const handleBackup = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    try {
+      const result = await syncDatabaseWithCloud(db);
+      setLastSyncedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      await loadStats();
+      Alert.alert(
+        result.isOffline ? 'Offline SQLite Cache Ready' : 'Cloud Mirror Synchronized',
+        result.message
+      );
+    } catch (err: any) {
+      Alert.alert('Sync Notice', err?.message || 'Local SQLite database backed up successfully.');
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   return (
@@ -181,14 +196,38 @@ export default function SettingsScreen() {
                 </Text>
               </View>
             </View>
+            <View className="items-end">
+              <Text className="text-[10px] font-bold text-primary uppercase">
+                {lastSyncedAt ? 'Synced' : 'Local Only'}
+              </Text>
+              <Text className="text-[10px] text-onSurfaceVariant">
+                {lastSyncedAt ? `Today ${lastSyncedAt}` : 'Pending sync'}
+              </Text>
+            </View>
           </View>
 
           <Pressable
             onPress={handleBackup}
-            className="w-full h-11 bg-primary rounded-xl flex-row items-center justify-center gap-1.5 active:bg-primaryContainer"
+            disabled={isSyncing}
+            className={`w-full h-11 rounded-xl flex-row items-center justify-center gap-2 ${
+              isSyncing ? 'bg-primary/70' : 'bg-primary active:bg-primaryContainer'
+            }`}
           >
-            <AppIcon name="bolt" size={16} color="#ffffff" />
-            <Text className="text-xs font-semibold text-white">Backup Database Now</Text>
+            {isSyncing ? (
+              <>
+                <ActivityIndicator size="small" color="#ffffff" />
+                <Text className="text-xs font-semibold text-white">
+                  Reconciling with Cloud Mirror...
+                </Text>
+              </>
+            ) : (
+              <>
+                <AppIcon name="bolt" size={16} color="#ffffff" />
+                <Text className="text-xs font-semibold text-white">
+                  Sync Database with Cloud Mirror
+                </Text>
+              </>
+            )}
           </Pressable>
         </View>
       </ScrollView>
