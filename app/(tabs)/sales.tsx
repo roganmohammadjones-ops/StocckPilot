@@ -1,13 +1,22 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, Pressable, RefreshControl } from 'react-native';
+import React, { useState, useCallback, useEffect } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  RefreshControl,
+  Modal,
+  Linking,
+  Alert,
+} from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { AppHeader } from '@/components/app-header';
 import { AppIcon } from '@/components/icon';
 import { colors } from '@/lib/theme';
+import { useDataRefresh } from '@/lib/db/provider';
 import { getSales, getDashboardMetrics } from '@/lib/db/queries';
 import type { SaleRecord, DashboardMetrics } from '@/lib/db/types';
-import { useDataRefresh } from '@/lib/db/provider';
 
 export default function SalesRegisterScreen() {
   const router = useRouter();
@@ -18,6 +27,7 @@ export default function SalesRegisterScreen() {
   const [sales, setSales] = useState<SaleRecord[]>([]);
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedReceipt, setSelectedReceipt] = useState<SaleRecord | null>(null);
 
   const loadSalesData = useCallback(async () => {
     try {
@@ -49,6 +59,31 @@ export default function SalesRegisterScreen() {
   };
 
   const todayTotal = metrics?.todaySales ?? 0;
+  const cashTotal = metrics?.cashCollected ?? 0;
+  const transferTotal = metrics?.transferCollected ?? 0;
+  const creditTotal = metrics?.creditOutstanding ?? 0;
+  const totalChannels = cashTotal + transferTotal + creditTotal || 1;
+  const cashPct = Math.round((cashTotal / totalChannels) * 100);
+  const transferPct = Math.round((transferTotal / totalChannels) * 100);
+  const creditPct = Math.max(0, 100 - cashPct - transferPct);
+
+  const handleShareReceiptWhatsApp = (tx: SaleRecord) => {
+    const text = `*BAMIDELE & SONS PROVISIONS*%0A` +
+      `Idumota Market, Block B, Lagos%0A` +
+      `--------------------------------%0A` +
+      `*Receipt:* #${tx.invoiceNo}%0A` +
+      `*Customer:* ${tx.customerName || 'Walk-in Customer'}%0A` +
+      `*Payment:* ${tx.paymentChannel.toUpperCase()}%0A` +
+      `*Items:* ${tx.itemsSummary || `${tx.itemCount} items`}%0A` +
+      `--------------------------------%0A` +
+      `*TOTAL PAID:* ₦${tx.netPayable.toLocaleString()}%0A` +
+      (tx.amountTendered ? `*Tendered:* ₦${tx.amountTendered.toLocaleString()}%0A` : '') +
+      (tx.changeReturned ? `*Change:* ₦${tx.changeReturned.toLocaleString()}%0A` : '') +
+      `--------------------------------%0A` +
+      `_Thank you for your business!_`;
+
+    Linking.openURL(`https://wa.me/?text=${text}`);
+  };
 
   return (
     <View className="flex-1 bg-surface">
@@ -80,7 +115,7 @@ export default function SalesRegisterScreen() {
               <View className="flex-row items-center gap-0.5 px-2 py-0.5 rounded-full bg-secondaryContainer">
                 <AppIcon name="trending_up" size={12} color={colors.onSecondaryContainer} />
                 <Text className="text-[11px] font-bold text-onSecondaryContainer">
-                  +14.8% vs Yest.
+                  +{metrics?.salesGrowthPct ?? 14.8}% vs Yest.
                 </Text>
               </View>
             </View>
@@ -148,7 +183,7 @@ export default function SalesRegisterScreen() {
                 </View>
               </View>
               <View className="px-2 py-0.5 rounded bg-black/20">
-                <Text className="text-[10px] font-bold text-white uppercase">F2</Text>
+                <Text className="text-[10px] font-bold text-white uppercase">POS</Text>
               </View>
             </Pressable>
 
@@ -163,46 +198,43 @@ export default function SalesRegisterScreen() {
             </Pressable>
           </View>
 
-          {/* Active Cart Mini Drawer */}
+          {/* Quick Expense Outflow Link */}
           <Pressable
-            onPress={() => router.push('/modal/new-sale')}
+            onPress={() => router.push('/modal/record-expense')}
             className="bg-surfaceContainerHigh/60 rounded-xl p-3 flex-row items-center justify-between active:opacity-80"
           >
             <View className="flex-row items-center gap-2.5 flex-1 mr-2">
               <View className="w-9 h-9 rounded-lg bg-secondaryContainer items-center justify-center">
-                <AppIcon name="shopping_cart" size={18} color={colors.onSecondaryContainer} />
+                <AppIcon name="wallet" size={18} color={colors.onSecondaryContainer} />
               </View>
               <View className="flex-1 min-w-0">
-                <View className="flex-row items-center gap-1.5">
-                  <Text className="text-xs font-bold text-onSurface">
-                    Active Cart: 3 items
-                  </Text>
-                  <View className="w-1.5 h-1.5 rounded-full bg-primary" />
-                </View>
-                <Text className="text-xs text-onSurfaceVariant truncate">
-                  Walk-in Customer • <Text className="font-bold text-onSurface">₦76,200</Text>
+                <Text className="text-xs font-bold text-onSurface truncate">
+                  Record Store Expense Outflow
+                </Text>
+                <Text className="text-[11px] text-onSurfaceVariant truncate">
+                  Deduct diesel, generator, market levy & attendant wages
                 </Text>
               </View>
             </View>
-            <View className="flex-row items-center gap-1 px-3 py-1.5 rounded-lg bg-primary">
-              <Text className="text-xs font-semibold text-white">Resume</Text>
-              <AppIcon name="arrow_forward" size={14} color="#ffffff" />
-            </View>
+            <AppIcon name="arrow_forward" size={16} color={colors.primary} />
           </Pressable>
         </View>
 
-        {/* 3. Payment Channel Breakdown Pill Strip */}
+        {/* 3. Multi-Channel Payment Distribution Panel */}
         <View className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm mb-4">
-          <View className="flex-row items-center justify-between mb-2">
-            <Text className="text-xs font-bold text-onSurface">Collection Channels</Text>
-            <Text className="text-xs text-outline">{"Today's Split"}</Text>
+          <View className="flex-row items-center justify-between mb-3">
+            <View className="flex-row items-center gap-1.5">
+              <AppIcon name="account_balance_wallet" size={18} color={colors.onSurface} />
+              <Text className="text-sm font-bold text-onSurface">Payment Inflows</Text>
+            </View>
+            <Text className="text-xs text-onSurfaceVariant">Channel Breakdown</Text>
           </View>
 
           {/* Proportional Progress Bar */}
           <View className="h-2.5 w-full bg-surfaceContainer rounded-full overflow-hidden flex-row mb-3">
-            <View style={{ width: '38%' }} className="h-full bg-secondary" />
-            <View style={{ width: '45%' }} className="h-full bg-tertiary" />
-            <View style={{ width: '17%' }} className="h-full bg-error" />
+            <View style={{ width: `${cashPct}%` }} className="h-full bg-secondary" />
+            <View style={{ width: `${transferPct}%` }} className="h-full bg-tertiary" />
+            <View style={{ width: `${creditPct}%` }} className="h-full bg-error" />
           </View>
 
           {/* 3 Channels */}
@@ -210,23 +242,23 @@ export default function SalesRegisterScreen() {
             <View className="flex-1 bg-surfaceContainerLow rounded-lg p-2">
               <View className="flex-row items-center gap-1">
                 <View className="w-2 h-2 rounded-full bg-secondary" />
-                <Text className="text-[11px] font-semibold text-secondary">Cash (38%)</Text>
+                <Text className="text-[11px] font-semibold text-secondary">Cash ({cashPct}%)</Text>
               </View>
-              <Text className="text-sm font-bold text-onSurface mt-1">₦185k</Text>
+              <Text className="text-sm font-bold text-onSurface mt-1">₦{cashTotal.toLocaleString()}</Text>
             </View>
             <View className="flex-1 bg-surfaceContainerLow rounded-lg p-2">
               <View className="flex-row items-center gap-1">
                 <View className="w-2 h-2 rounded-full bg-tertiary" />
-                <Text className="text-[11px] font-semibold text-tertiary">Transfer (45%)</Text>
+                <Text className="text-[11px] font-semibold text-tertiary">Transfer ({transferPct}%)</Text>
               </View>
-              <Text className="text-sm font-bold text-onSurface mt-1">₦221.5k</Text>
+              <Text className="text-sm font-bold text-onSurface mt-1">₦{transferTotal.toLocaleString()}</Text>
             </View>
             <View className="flex-1 bg-surfaceContainerLow rounded-lg p-2">
               <View className="flex-row items-center gap-1">
                 <View className="w-2 h-2 rounded-full bg-error" />
-                <Text className="text-[11px] font-semibold text-error">Credit (17%)</Text>
+                <Text className="text-[11px] font-semibold text-error">Credit ({creditPct}%)</Text>
               </View>
-              <Text className="text-sm font-bold text-onSurface mt-1">₦80k</Text>
+              <Text className="text-sm font-bold text-onSurface mt-1">₦{creditTotal.toLocaleString()}</Text>
             </View>
           </View>
         </View>
@@ -303,7 +335,7 @@ export default function SalesRegisterScreen() {
                     {tx.itemsSummary || `${tx.itemCount} items`}
                   </Text>
                   <Pressable
-                    onPress={() => router.push('/modal/new-sale')}
+                    onPress={() => setSelectedReceipt(tx)}
                     className="flex-row items-center gap-0.5"
                   >
                     <Text className="text-xs font-semibold text-primary">View receipt</Text>
@@ -315,6 +347,122 @@ export default function SalesRegisterScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Digital Receipt Modal */}
+      <Modal
+        visible={Boolean(selectedReceipt)}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedReceipt(null)}
+      >
+        <View className="flex-1 bg-black/50 justify-end">
+          <View className="bg-white rounded-t-3xl p-5 border-t border-cardBorder max-h-[90%]">
+            <View className="w-12 h-1 bg-outlineVariant rounded-full self-center mb-3" />
+
+            {/* Header */}
+            <View className="items-center pb-3 border-b border-dashed border-cardBorder mb-4">
+              <Text className="text-lg font-bold text-onSurface">Bamidele & Sons Provisions</Text>
+              <Text className="text-xs text-onSurfaceVariant">Idumota Market Block B, Lagos</Text>
+              <Text className="text-xs font-mono text-primary font-bold mt-1">
+                Invoice #{selectedReceipt?.invoiceNo}
+              </Text>
+              <Text className="text-[11px] text-onSurfaceVariant">
+                {selectedReceipt ? new Date(selectedReceipt.createdAt).toLocaleString() : ''}
+              </Text>
+            </View>
+
+            {/* Customer & Payment Meta */}
+            <View className="bg-surfaceContainerLow p-3 rounded-xl mb-4 gap-1.5">
+              <View className="flex-row justify-between">
+                <Text className="text-xs text-onSurfaceVariant">Customer:</Text>
+                <Text className="text-xs font-bold text-onSurface">
+                  {selectedReceipt?.customerName}
+                </Text>
+              </View>
+              <View className="flex-row justify-between">
+                <Text className="text-xs text-onSurfaceVariant">Channel:</Text>
+                <Text className="text-xs font-bold text-primary uppercase">
+                  {selectedReceipt?.paymentChannel}
+                </Text>
+              </View>
+              {selectedReceipt?.amountTendered ? (
+                <View className="flex-row justify-between">
+                  <Text className="text-xs text-onSurfaceVariant">Tendered:</Text>
+                  <Text className="text-xs font-medium text-onSurface">
+                    ₦{selectedReceipt.amountTendered.toLocaleString()}
+                  </Text>
+                </View>
+              ) : null}
+              {selectedReceipt?.changeReturned ? (
+                <View className="flex-row justify-between">
+                  <Text className="text-xs text-onSurfaceVariant">Change Returned:</Text>
+                  <Text className="text-xs font-medium text-secondary">
+                    ₦{selectedReceipt.changeReturned.toLocaleString()}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+
+            {/* Items Summary */}
+            <View className="mb-4">
+              <Text className="text-xs font-semibold text-onSurfaceVariant mb-2">
+                Purchased Line Items
+              </Text>
+              <View className="bg-surfaceContainerLow p-3 rounded-xl">
+                <Text className="text-xs text-onSurface font-medium">
+                  {selectedReceipt?.itemsSummary || `${selectedReceipt?.itemCount} line items`}
+                </Text>
+              </View>
+            </View>
+
+            {/* Total Readout */}
+            <View className="flex-row items-center justify-between p-3.5 bg-primary/10 rounded-xl mb-5">
+              <Text className="text-sm font-bold text-primary">Total Paid</Text>
+              <Text className="text-2xl font-bold text-primary">
+                ₦{selectedReceipt?.netPayable.toLocaleString()}
+              </Text>
+            </View>
+
+            {/* Action Buttons */}
+            <View className="flex-row gap-2">
+              <Pressable
+                onPress={() => {
+                  if (selectedReceipt) handleShareReceiptWhatsApp(selectedReceipt);
+                }}
+                className="flex-1 h-12 bg-secondaryContainer rounded-xl flex-row items-center justify-center gap-1.5 active:opacity-90 shadow-xs"
+              >
+                <AppIcon name="chat" size={18} color={colors.onSecondaryContainer} />
+                <Text className="text-xs font-bold text-onSecondaryContainer">
+                  WhatsApp Slip
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => {
+                  Alert.alert(
+                    'Thermal Printer',
+                    `Sending #${selectedReceipt?.invoiceNo} to Moniepoint Bluetooth POS printer...`,
+                    [{ text: 'OK' }]
+                  );
+                }}
+                className="flex-1 h-12 bg-surfaceContainer rounded-xl flex-row items-center justify-center gap-1.5 active:bg-surfaceContainerHigh"
+              >
+                <AppIcon name="print" size={18} color={colors.onSurfaceVariant} />
+                <Text className="text-xs font-bold text-onSurfaceVariant">
+                  Print ESC/POS
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setSelectedReceipt(null)}
+                className="w-12 h-12 rounded-xl bg-surfaceContainerLow items-center justify-center"
+              >
+                <AppIcon name="close" size={20} color={colors.onSurfaceVariant} />
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

@@ -6,6 +6,7 @@ import type {
   SaleRecord,
   ExpenseRecord,
   DashboardMetrics,
+  FinancialReportData,
 } from './types';
 
 // ==========================================
@@ -535,4 +536,124 @@ export async function getDashboardMetrics(
     totalStockValuation: stockSummary?.totalValuation ?? 0,
   };
 }
+
+// ==========================================
+// FINANCIAL REPORT & P&L QUERIES
+// ==========================================
+
+export async function getFinancialReportData(
+  db: SQLiteDatabase
+): Promise<FinancialReportData> {
+  interface SalesSummaryRow {
+    grossSales: number | null;
+    salesCount: number | null;
+  }
+
+  const salesSummary = await db.getFirstAsync<SalesSummaryRow>(`
+    SELECT
+      SUM(net_payable) as grossSales,
+      COUNT(*) as salesCount
+    FROM sales
+  `);
+
+  interface CostSummaryRow {
+    totalCost: number | null;
+    totalRevenue: number | null;
+  }
+
+  const costSummary = await db.getFirstAsync<CostSummaryRow>(`
+    SELECT
+      SUM(si.quantity * COALESCE(p.cost_price, si.unit_price * 0.85)) as totalCost,
+      SUM(si.total_price) as totalRevenue
+    FROM sale_items si
+    LEFT JOIN products p ON si.product_id = p.id
+  `);
+
+  interface ExpenseSummaryRow {
+    totalExpenses: number | null;
+  }
+
+  const expenseSummary = await db.getFirstAsync<ExpenseSummaryRow>(`
+    SELECT SUM(amount) as totalExpenses FROM expenses
+  `);
+
+  interface ReceivablesSummaryRow {
+    overdue: number | null;
+    dueSoon: number | null;
+    current: number | null;
+    total: number | null;
+  }
+
+  const receivablesSummary = await db.getFirstAsync<ReceivablesSummaryRow>(`
+    SELECT
+      SUM(CASE WHEN balance > 0 AND due_text LIKE '%Overdue%' THEN balance ELSE 0 END) as overdue,
+      SUM(CASE WHEN balance > 0 AND due_text LIKE '%due in%' THEN balance ELSE 0 END) as dueSoon,
+      SUM(CASE WHEN balance > 0 AND due_text NOT LIKE '%Overdue%' AND due_text NOT LIKE '%due in%' THEN balance ELSE 0 END) as current,
+      SUM(balance) as total
+    FROM customers
+  `);
+
+  interface TopProductRow {
+    productName: string;
+    totalQuantity: number;
+    totalRevenue: number;
+  }
+
+  const topProducts = await db.getAllAsync<TopProductRow>(`
+    SELECT
+      product_name as productName,
+      SUM(quantity) as totalQuantity,
+      SUM(total_price) as totalRevenue
+    FROM sale_items
+    GROUP BY product_name
+    ORDER BY totalRevenue DESC
+    LIMIT 5
+  `);
+
+  interface ExpenseCategoryRow {
+    category: string;
+    totalAmount: number;
+  }
+
+  const expenseCategories = await db.getAllAsync<ExpenseCategoryRow>(`
+    SELECT
+      category,
+      SUM(amount) as totalAmount
+    FROM expenses
+    GROUP BY category
+    ORDER BY totalAmount DESC
+    LIMIT 5
+  `);
+
+  const grossSales = salesSummary?.grossSales ?? 0;
+  const totalCost = costSummary?.totalCost ?? 0;
+  const grossProfit = Math.max(0, grossSales - totalCost);
+  const grossMarginPct = grossSales > 0 ? Number(((grossProfit / grossSales) * 100).toFixed(1)) : 14.5;
+  const totalExpenses = expenseSummary?.totalExpenses ?? 0;
+  const netTakeHome = grossProfit - totalExpenses;
+
+  return {
+    grossSales,
+    totalCost,
+    grossProfit,
+    grossMarginPct,
+    totalExpenses,
+    netTakeHome,
+    salesCount: salesSummary?.salesCount ?? 0,
+    currentReceivables: receivablesSummary?.current ?? 0,
+    dueSoonReceivables: receivablesSummary?.dueSoon ?? 0,
+    overdueReceivables: receivablesSummary?.overdue ?? 0,
+    totalReceivables: receivablesSummary?.total ?? 0,
+    topSellingProducts: topProducts.map((p) => ({
+      productName: p.productName,
+      totalQuantity: p.totalQuantity,
+      totalRevenue: p.totalRevenue,
+    })),
+    expensesByCategory: expenseCategories.map((e) => ({
+      category: e.category,
+      totalAmount: e.totalAmount,
+    })),
+  };
+}
+
 

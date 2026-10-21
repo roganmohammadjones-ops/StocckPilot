@@ -95,3 +95,27 @@ export interface DashboardMetrics {
   totalStockValuation: number;
 }
 
+export interface FinancialReportData {
+  grossSales: number;
+  totalCost: number;
+  grossProfit: number;
+  grossMarginPct: number;
+  totalExpenses: number;
+  netTakeHome: number;
+  salesCount: number;
+  currentReceivables: number;
+  dueSoonReceivables: number;
+  overdueReceivables: number;
+  totalReceivables: number;
+  topSellingProducts: {
+    productName: string;
+    totalQuantity: number;
+    totalRevenue: number;
+  }[];
+  expensesByCategory: {
+    category: string;
+    totalAmount: number;
+  }[];
+}
+
+

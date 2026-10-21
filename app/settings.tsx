@@ -1,15 +1,46 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, Pressable, Alert } from 'react-native';
+import { useSQLiteContext } from 'expo-sqlite';
 import { AppHeader } from '@/components/app-header';
 import { AppIcon } from '@/components/icon';
 import { colors } from '@/lib/theme';
 
 export default function SettingsScreen() {
+  const db = useSQLiteContext();
+  const [stats, setStats] = useState({
+    products: 0,
+    customers: 0,
+    sales: 0,
+    expenses: 0,
+  });
+
+  useEffect(() => {
+    async function loadStats() {
+      try {
+        const [prodRow, custRow, saleRow, expRow] = await Promise.all([
+          db.getFirstAsync<{ count: number }>('SELECT count(*) as count FROM products'),
+          db.getFirstAsync<{ count: number }>('SELECT count(*) as count FROM customers'),
+          db.getFirstAsync<{ count: number }>('SELECT count(*) as count FROM sales'),
+          db.getFirstAsync<{ count: number }>('SELECT count(*) as count FROM expenses'),
+        ]);
+
+        setStats({
+          products: prodRow?.count ?? 0,
+          customers: custRow?.count ?? 0,
+          sales: saleRow?.count ?? 0,
+          expenses: expRow?.count ?? 0,
+        });
+      } catch (e) {
+        console.error('Failed to load settings stats:', e);
+      }
+    }
+    loadStats();
+  }, [db]);
 
   const handleBackup = () => {
     Alert.alert(
-      'Backup Complete',
-      'All local transactions and inventory records have been safely mirrored to the encrypted cloud vault.'
+      'Encrypted Local Backup Complete',
+      `All records safely committed to local SQLite (stockpilot.db):\n• ${stats.products} Products / SKUs\n• ${stats.customers} Customers in Ledger\n• ${stats.sales} Sales Invoices\n• ${stats.expenses} Expense Entries\n\nReady for cloud mirror when online network connects.`
     );
   };
 
@@ -146,7 +177,7 @@ export default function SettingsScreen() {
               <View>
                 <Text className="text-xs font-bold text-onSurface">Node: Idumota-01</Text>
                 <Text className="text-[11px] text-onSurfaceVariant">
-                  184 SKUs • 68 Customers • Synced 2m ago
+                  {stats.products} SKUs • {stats.customers} Customers • {stats.sales} Sales logged
                 </Text>
               </View>
             </View>

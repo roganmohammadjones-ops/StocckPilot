@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSQLiteContext } from 'expo-sqlite';
 import { AppHeader } from '@/components/app-header';
 import { AppIcon } from '@/components/icon';
 import { colors } from '@/lib/theme';
+import { useDataRefresh } from '@/lib/db/provider';
 
 interface MenuItem {
   title: string;
@@ -21,6 +23,26 @@ interface MenuSection {
 
 export default function MoreHubScreen() {
   const router = useRouter();
+  const db = useSQLiteContext();
+  const { dataVersion } = useDataRefresh();
+  const [productCount, setProductCount] = useState(0);
+  const [customerCount, setCustomerCount] = useState(0);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [prod, cust] = await Promise.all([
+          db.getFirstAsync<{ count: number }>('SELECT count(*) as count FROM products'),
+          db.getFirstAsync<{ count: number }>('SELECT count(*) as count FROM customers'),
+        ]);
+        setProductCount(prod?.count ?? 0);
+        setCustomerCount(cust?.count ?? 0);
+      } catch (e) {
+        console.error('Failed to load more screen stats:', e);
+      }
+    }
+    loadData();
+  }, [db, dataVersion]);
 
   const menuSections: MenuSection[] = [
     {
@@ -95,13 +117,15 @@ export default function MoreHubScreen() {
               <Text className="text-xs text-onSurfaceVariant mt-0.5">
                 Idumota Wholesale Depot • Counter Till #1
               </Text>
-              <View className="flex-row items-center gap-2 mt-1">
+              <View className="flex-row items-center gap-2 mt-1 flex-wrap">
                 <View className="px-2 py-0.5 rounded bg-secondaryContainer">
                   <Text className="text-[10px] font-bold text-onSecondaryContainer">
                     Tier 1 Merchant
                   </Text>
                 </View>
-                <Text className="text-[11px] text-outline">Offline sync active</Text>
+                <Text className="text-[11px] text-outline">
+                  {productCount} SKUs • {customerCount} Customers
+                </Text>
               </View>
             </View>
           </View>
