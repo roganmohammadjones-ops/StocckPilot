@@ -1,56 +1,66 @@
-# Welcome to your Expo app 👋
+# StockPilot Nigeria
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A minimal mobile foundation for inventory and credit management for Nigerian wholesalers and retailers. Built with Expo SDK 57, TypeScript, Expo Router and NativeWind 4.2.7.
 
-## Get started
+## Run locally
 
-1. Install dependencies
+Use Node.js 24 LTS and npm. Dependencies are locked in `package-lock.json`.
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```sh
+npm ci
+npm start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Open the QR code in an SDK 57-compatible Expo Go client. Alternatively:
 
-### Other setup steps
+```sh
+npm run web      # Browser
+npm run android  # Android emulator / connected device
+npm run ios      # iOS simulator (macOS, Xcode and a simulator runtime required)
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+After changing Babel, Metro or NativeWind configuration, restart with `npx expo start --clear`.
 
-## Learn more
+## Structure
 
-To learn more about developing your project with Expo, look at the following resources:
+```text
+app/                 Expo Router routes and navigation only
+  _layout.tsx        Root native stack and global CSS import
+  index.tsx          Minimal landing screen
+  setup-check.tsx    NativeWind and navigation smoke-test screen
+  +not-found.tsx     Unknown-route recovery
+components/          Reusable UI; Screen handles scrolling and bottom safe area
+features/
+  inventory/         Future inventory feature
+  sales/             Future sales feature
+  customers/         Future customer and credit feature
+  reports/           Future reporting feature
+lib/                 Shared utilities and integrations
+hooks/               Reusable React hooks
+types/               Shared TypeScript types
+assets/              Images, fonts and icons
+.agents/skills/      Installed official Expo skills
+docs/                Setup record and validation results
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+The empty feature folders are intentional. No inventory, sales, customer, credit, authentication, storage, or reporting workflows are implemented. The amount on the check screen is a static styling sample. The counter resets when its screen unmounts. App icons remain Expo template placeholders. The starter uses a light appearance.
 
-## Join the community
+## Styling
 
-Join our community of developers creating universal apps.
+Follow the [official NativeWind v4 installation guide](https://www.nativewind.dev/docs/getting-started/installation). NativeWind 4.2.7 supports SDK 57 and uses Tailwind 3. Configuration lives in `tailwind.config.js`, `global.css`, `babel.config.js`, `metro.config.js`, and `nativewind-env.d.ts`.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Add complete literal utility classes in `app/`, `components/`, or `features/`. If UI is added in another folder, include it in Tailwind's `content` list. Keep the global CSS import in the root layout. Do not mix in NativeWind 5 / Tailwind 4 instructions.
+
+## Checks
+
+```sh
+npm run typecheck
+npm run lint
+npm run check:dependencies
+npm run doctor
+npm run export:all
+```
+
+Open **Open foundation check** from the home screen. Confirm the card is green, increment the counter to turn it blue, and use **Return to home** or the stack back button. A direct `/setup-check` URL should also load. An unknown path should offer a home link.
+
+See [the setup record](docs/setup.md) for exact versions, executed setup commands, validation evidence, and environment limitations. Keep SDK 57 until an upgrade is explicitly agreed. Install new packages with `npx expo install <package>`.
