@@ -9,12 +9,11 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
 import { AppHeader } from '@/components/app-header';
 import { AppIcon } from '@/components/icon';
 import { BrandLoader } from '@/components/brand-loader';
 import { colors } from '@/lib/theme';
-import { useDataRefresh } from '@/lib/db/provider';
+import { useDataRefresh, useAppDb } from '@/lib/db/provider';
 import {
   getDashboardMetrics,
   getProducts,
@@ -32,7 +31,7 @@ import type {
 
 export default function HomeDashboardScreen() {
   const router = useRouter();
-  const db = useSQLiteContext();
+  const db = useAppDb();
   const { refreshTrigger } = useDataRefresh();
 
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);

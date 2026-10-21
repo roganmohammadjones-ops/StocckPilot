@@ -1,4 +1,4 @@
-import type { SQLiteDatabase } from 'expo-sqlite';
+import type { AppDatabase } from './web-db';
 import type {
   Product,
   Customer,
@@ -9,6 +9,8 @@ import type {
   FinancialReportData,
   ShiftRecord,
 } from './types';
+
+export type SQLiteDatabase = AppDatabase;
 
 // ==========================================
 // PRODUCTS QUERIES

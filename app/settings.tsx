@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
 import { AppHeader } from '@/components/app-header';
 import { AppIcon } from '@/components/icon';
 import { BrandLogo } from '@/components/brand-logo';
 import { colors } from '@/lib/theme';
 import { syncDatabaseWithCloud } from '@/lib/db/sync';
+import { useAppDb } from '@/lib/db/provider';
 import { logout } from '@/lib/auth';
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const db = useSQLiteContext();
+  const db = useAppDb();
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [stats, setStats] = useState({

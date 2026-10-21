@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useCallback, Suspense } from 'react';
-import { SQLiteProvider } from 'expo-sqlite';
+import { SQLiteProvider, useSQLiteContext } from 'expo-sqlite';
 import { initDatabase } from './init';
 import { BrandLoader } from '@/components/brand-loader';
+import type { AppDatabase } from './web-db';
 
 interface DataRefreshContextType {
   dataVersion: number;
@@ -41,6 +42,10 @@ export function StockPilotDatabaseProvider({ children }: { children: React.React
       </SQLiteProvider>
     </Suspense>
   );
+}
+
+export function useAppDb(): AppDatabase {
+  return useSQLiteContext() as unknown as AppDatabase;
 }
 
 export function useDataRefresh() {

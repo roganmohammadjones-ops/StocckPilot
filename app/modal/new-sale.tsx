@@ -11,11 +11,10 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useSQLiteContext } from 'expo-sqlite';
 import { AppIcon } from '@/components/icon';
 import { colors } from '@/lib/theme';
 import { createSale, getProducts, getCustomers } from '@/lib/db/queries';
-import { useDataRefresh } from '@/lib/db/provider';
+import { useDataRefresh, useAppDb } from '@/lib/db/provider';
 import type { Product, Customer } from '@/lib/db/types';
 
 interface CartItem {
@@ -38,7 +37,7 @@ function generateInvoiceNo(): string {
 export default function NewSaleModal() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const db = useSQLiteContext();
+  const db = useAppDb();
   const { triggerRefresh } = useDataRefresh();
 
   const [products, setProducts] = useState<Product[]>([]);

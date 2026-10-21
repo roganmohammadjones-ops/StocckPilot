@@ -8,18 +8,17 @@ import {
   Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
 import { AppHeader } from '@/components/app-header';
 import { AppIcon } from '@/components/icon';
 import { BrandLoader } from '@/components/brand-loader';
 import { colors } from '@/lib/theme';
-import { useDataRefresh } from '@/lib/db/provider';
+import { useDataRefresh, useAppDb } from '@/lib/db/provider';
 import { getFinancialReportData } from '@/lib/db/queries';
 import type { FinancialReportData } from '@/lib/db/types';
 
 export default function ReportsScreen() {
   const router = useRouter();
-  const db = useSQLiteContext();
+  const db = useAppDb();
   const { refreshTrigger } = useDataRefresh();
 
   const [report, setReport] = useState<FinancialReportData | null>(null);

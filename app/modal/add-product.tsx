@@ -9,16 +9,15 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useSQLiteContext } from 'expo-sqlite';
 import { AppIcon } from '@/components/icon';
 import { colors } from '@/lib/theme';
 import { addProduct } from '@/lib/db/queries';
-import { useDataRefresh } from '@/lib/db/provider';
+import { useDataRefresh, useAppDb } from '@/lib/db/provider';
 
 export default function AddProductModal() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const db = useSQLiteContext();
+  const db = useAppDb();
   const { triggerRefresh } = useDataRefresh();
 
   const [name, setName] = useState('Dangote Classic Seasoning Cubes (Carton 40x100)');

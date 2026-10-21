@@ -11,12 +11,11 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
 import { AppHeader } from '@/components/app-header';
 import { AppIcon } from '@/components/icon';
 import { BrandLoader } from '@/components/brand-loader';
 import { colors } from '@/lib/theme';
-import { useDataRefresh } from '@/lib/db/provider';
+import { useDataRefresh, useAppDb } from '@/lib/db/provider';
 import {
   getCustomers,
   recordDebtPayment,
@@ -27,7 +26,7 @@ import type { Customer, DashboardMetrics } from '@/lib/db/types';
 
 export default function CustomersLedgerScreen() {
   const router = useRouter();
-  const db = useSQLiteContext();
+  const db = useAppDb();
   const { refreshTrigger, triggerRefresh } = useDataRefresh();
 
   const [customers, setCustomers] = useState<Customer[]>([]);

@@ -1,6 +1,8 @@
-import type { SQLiteDatabase } from 'expo-sqlite';
+import type { AppDatabase } from './web-db';
 import { supabase } from '@/lib/supabase';
 import { getProducts, getCustomers, getSales, getExpenses } from './queries';
+
+export type SQLiteDatabase = AppDatabase;
 
 export interface SyncResult {
   success: boolean;

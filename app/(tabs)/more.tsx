@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
 import { AppHeader } from '@/components/app-header';
 import { AppIcon } from '@/components/icon';
 import { BrandLogo } from '@/components/brand-logo';
 import { colors } from '@/lib/theme';
-import { useDataRefresh } from '@/lib/db/provider';
+import { useDataRefresh, useAppDb } from '@/lib/db/provider';
 import { getStoredUser, logout } from '@/lib/auth';
 
 interface MenuItem {
@@ -25,7 +24,7 @@ interface MenuSection {
 
 export default function MoreHubScreen() {
   const router = useRouter();
-  const db = useSQLiteContext();
+  const db = useAppDb();
   const { dataVersion } = useDataRefresh();
   const [productCount, setProductCount] = useState(0);
   const [customerCount, setCustomerCount] = useState(0);

@@ -10,11 +10,10 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
 import { AppHeader } from '@/components/app-header';
 import { AppIcon } from '@/components/icon';
 import { colors } from '@/lib/theme';
-import { useDataRefresh } from '@/lib/db/provider';
+import { useDataRefresh, useAppDb } from '@/lib/db/provider';
 import { getProducts, updateProductStock } from '@/lib/db/queries';
 import type { Product } from '@/lib/db/types';
 
@@ -80,7 +79,7 @@ const mockSellers: SellerStall[] = [
 
 export default function ExploreSellersScreen() {
   const router = useRouter();
-  const db = useSQLiteContext();
+  const db = useAppDb();
   const { triggerRefresh } = useDataRefresh();
 
   const [search, setSearch] = useState('');

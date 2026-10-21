@@ -1,17 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TextInput, Pressable, RefreshControl } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
 import { AppHeader } from '@/components/app-header';
 import { AppIcon } from '@/components/icon';
 import { colors } from '@/lib/theme';
 import { getProducts } from '@/lib/db/queries';
 import type { Product } from '@/lib/db/types';
-import { useDataRefresh } from '@/lib/db/provider';
+import { useDataRefresh, useAppDb } from '@/lib/db/provider';
 
 export default function InventoryScreen() {
   const router = useRouter();
-  const db = useSQLiteContext();
+  const db = useAppDb();
   const { dataVersion } = useDataRefresh();
 
   const [products, setProducts] = useState<Product[]>([]);
