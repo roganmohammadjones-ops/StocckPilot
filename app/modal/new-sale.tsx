@@ -10,8 +10,11 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSQLiteContext } from 'expo-sqlite';
 import { AppIcon } from '@/components/icon';
 import { colors } from '@/lib/theme';
+import { createSale } from '@/lib/db/queries';
+import { useDataRefresh } from '@/lib/db/provider';
 
 interface CartItem {
   id: string;
@@ -22,9 +25,16 @@ interface CartItem {
   icon: string;
 }
 
+function generateInvoiceNo(): string {
+  return `SP-${Math.floor(1000 + Math.random() * 9000)}`;
+}
+
 export default function NewSaleModal() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const db = useSQLiteContext();
+  const { triggerRefresh } = useDataRefresh();
+  const [submitting, setSubmitting] = useState(false);
 
   const [cart, setCart] = useState<CartItem[]>([
     {
@@ -36,7 +46,7 @@ export default function NewSaleModal() {
       icon: 'inventory_2',
     },
     {
-      id: '2',
+      id: '3',
       name: 'Peak Evaporated Milk 160g (Carton 48)',
       unitPrice: 34200,
       quantity: 2,
@@ -44,7 +54,7 @@ export default function NewSaleModal() {
       icon: 'category',
     },
     {
-      id: '3',
+      id: '2',
       name: 'Golden Penny Semovita 10kg',
       unitPrice: 36000,
       quantity: 1,
@@ -80,26 +90,62 @@ export default function NewSaleModal() {
   const parsedTendered = parseInt(tenderedAmount.replace(/[^0-9]/g, ''), 10) || 0;
   const changeDue = parsedTendered - netPayable;
 
-  const handleConfirmSale = () => {
-    Alert.alert(
-      'Sale Recorded Successfully',
-      `Invoice #SP-1095 for ₦${netPayable.toLocaleString()} has been committed to the local ledger.`,
-      [
-        {
-          text: 'Send WhatsApp Slip',
-          onPress: () => {
-            Linking.openURL(
-              `https://wa.me/${phoneNumber.replace(/[^0-9]/g, '')}?text=Receipt%20#SP-1095%20from%20Bamidele%20&%20Sons:%20Amount%20₦${netPayable.toLocaleString()}%20received.%20Thank%20you%20for%20your%20patronage!`
-            );
-            router.back();
+  const handleConfirmSale = async () => {
+    if (cart.length === 0) {
+      Alert.alert('Empty Cart', 'Please add at least one product to the sale.');
+      return;
+    }
+
+    const invoiceNo = generateInvoiceNo();
+
+    try {
+      setSubmitting(true);
+      await createSale(db, {
+        invoiceNo,
+        customerId: customerType === 'registered' ? 'cust_1' : undefined,
+        customerName: customerType === 'registered' ? 'Mama Nkechi Stores' : 'Walk-in Cash Customer',
+        totalAmount: grossSubtotal,
+        discountAmount: discount,
+        netPayable,
+        paymentChannel,
+        amountTendered: paymentChannel === 'cash' ? parsedTendered : undefined,
+        changeReturned: paymentChannel === 'cash' ? Math.max(0, changeDue) : undefined,
+        items: cart.map((item) => ({
+          productId: item.id.startsWith('prod_') ? item.id : `prod_${item.id}`,
+          productName: item.name,
+          sku: item.name.substring(0, 3).toUpperCase(),
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+        })),
+      });
+
+      triggerRefresh();
+
+      Alert.alert(
+        'Sale Recorded Successfully',
+        `Invoice #${invoiceNo} for ₦${netPayable.toLocaleString()} has been committed to the local ledger.`,
+        [
+          {
+            text: 'Send WhatsApp Slip',
+            onPress: () => {
+              Linking.openURL(
+                `https://wa.me/${phoneNumber.replace(/[^0-9]/g, '')}?text=Receipt%20#${invoiceNo}%20from%20StockPilot%20Store:%20Amount%20₦${netPayable.toLocaleString()}%20recorded.%20Thank%20you%20for%20your%20patronage!`
+              );
+              router.back();
+            },
           },
-        },
-        {
-          text: 'Done',
-          onPress: () => router.back(),
-        },
-      ]
-    );
+          {
+            text: 'Done',
+            onPress: () => router.back(),
+          },
+        ]
+      );
+    } catch (err: any) {
+      console.error('Failed to create sale', err);
+      Alert.alert('Error', err?.message || 'Could not record sale. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -521,11 +567,14 @@ export default function NewSaleModal() {
         {/* Primary Final Action CTA */}
         <Pressable
           onPress={handleConfirmSale}
-          className="w-full h-14 bg-primary rounded-2xl flex-row items-center justify-center gap-2 shadow-lg active:bg-primaryContainer mb-2"
+          disabled={submitting}
+          className={`w-full h-14 bg-primary rounded-2xl flex-row items-center justify-center gap-2 shadow-lg active:bg-primaryContainer mb-2 ${
+            submitting ? 'opacity-60' : ''
+          }`}
         >
           <AppIcon name="check_circle" size={22} color="#ffffff" />
           <Text className="text-base font-bold text-white">
-            Confirm & Record ₦{netPayable.toLocaleString()}
+            {submitting ? 'Recording Sale...' : `Confirm & Record ₦${netPayable.toLocaleString()}`}
           </Text>
         </Pressable>
 

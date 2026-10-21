@@ -2,12 +2,13 @@ import '../global.css';
 
 import { Stack } from 'expo-router/stack';
 import { StatusBar } from 'expo-status-bar';
+import { StockPilotDatabaseProvider } from '@/lib/db/provider';
 
 export const unstable_settings = { initialRouteName: '(tabs)' };
 
 export default function RootLayout() {
   return (
-    <>
+    <StockPilotDatabaseProvider>
       <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -29,6 +30,6 @@ export default function RootLayout() {
         <Stack.Screen name="setup-check" options={{ headerShown: true, title: 'Foundation Check' }} />
         <Stack.Screen name="+not-found" options={{ headerShown: true, title: 'Page not found' }} />
       </Stack>
-    </>
+    </StockPilotDatabaseProvider>
   );
 }

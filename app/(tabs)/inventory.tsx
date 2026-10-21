@@ -1,130 +1,64 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, ScrollView, TextInput, Pressable, RefreshControl } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useSQLiteContext } from 'expo-sqlite';
 import { AppHeader } from '@/components/app-header';
 import { AppIcon } from '@/components/icon';
 import { colors } from '@/lib/theme';
-
-interface ProductItem {
-  id: string;
-  name: string;
-  sku: string;
-  category: string;
-  categorySlug: string;
-  stockLeft: number;
-  stockUnit: string;
-  minAlert: number;
-  costPrice: number;
-  sellingPrice: number;
-  status: 'low' | 'healthy' | 'out';
-  recentNote: string;
-}
-
-const mockProducts: ProductItem[] = [
-  {
-    id: '1',
-    name: 'Dangote Refined Sugar 50kg',
-    sku: 'DNG-SUG-50',
-    category: 'Grains & Staples',
-    categorySlug: 'grains',
-    stockLeft: 2,
-    stockUnit: 'bags',
-    minAlert: 10,
-    costPrice: 68000,
-    sellingPrice: 74500,
-    status: 'low',
-    recentNote: 'Sold 18 yesterday',
-  },
-  {
-    id: '2',
-    name: 'Golden Penny Semovita 10kg (Pack of 5)',
-    sku: 'GP-SEMO-10K',
-    category: 'Grains & Staples',
-    categorySlug: 'grains',
-    stockLeft: 4,
-    stockUnit: 'packs',
-    minAlert: 8,
-    costPrice: 32000,
-    sellingPrice: 36000,
-    status: 'low',
-    recentNote: 'Supplier: Flour Mills Nig',
-  },
-  {
-    id: '3',
-    name: 'Peak Evaporated Milk 160g (Carton of 48)',
-    sku: 'PEAK-CAN-48',
-    category: 'Canned & Dairy',
-    categorySlug: 'canned',
-    stockLeft: 86,
-    stockUnit: 'cartons',
-    minAlert: 15,
-    costPrice: 31500,
-    sellingPrice: 34200,
-    status: 'healthy',
-    recentNote: '50 ctns received 4h ago',
-  },
-  {
-    id: '4',
-    name: 'Indomie Instant Noodles 70g (Carton of 40)',
-    sku: 'IND-NOOD-40',
-    category: 'Grains & Staples',
-    categorySlug: 'grains',
-    stockLeft: 120,
-    stockUnit: 'cartons',
-    minAlert: 20,
-    costPrice: 11200,
-    sellingPrice: 12600,
-    status: 'healthy',
-    recentNote: 'High turnover SKU',
-  },
-  {
-    id: '5',
-    name: 'Mamador Pure Vegetable Oil 25L',
-    sku: 'MAM-OIL-25L',
-    category: 'Oils & Condiments',
-    categorySlug: 'oils',
-    stockLeft: 1,
-    stockUnit: 'jerrycan',
-    minAlert: 5,
-    costPrice: 54000,
-    sellingPrice: 59500,
-    status: 'low',
-    recentNote: 'Reorder critical',
-  },
-  {
-    id: '6',
-    name: 'Milo Refill Economy Pack 800g (Carton of 12)',
-    sku: 'MILO-800-12',
-    category: 'Beverages',
-    categorySlug: 'beverages',
-    stockLeft: 0,
-    stockUnit: 'cartons',
-    minAlert: 10,
-    costPrice: 48000,
-    sellingPrice: 53000,
-    status: 'out',
-    recentNote: 'Out of stock since Tuesday',
-  },
-];
+import { getProducts } from '@/lib/db/queries';
+import type { Product } from '@/lib/db/types';
+import { useDataRefresh } from '@/lib/db/provider';
 
 export default function InventoryScreen() {
   const router = useRouter();
+  const db = useSQLiteContext();
+  const { dataVersion } = useDataRefresh();
+
+  const [products, setProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'low' | 'out'>('all');
+  const [refreshing, setRefreshing] = useState(false);
 
-  const filteredProducts = mockProducts.filter((item) => {
-    const matchesSearch =
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.sku.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory =
-      selectedCategory === 'all' || item.categorySlug === selectedCategory;
-    const matchesStatus =
+  const fetchItems = useCallback(async () => {
+    try {
+      const items = await getProducts(db, searchQuery, selectedCategory);
+      setProducts(items);
+    } catch (e) {
+      console.error('Error fetching inventory:', e);
+    }
+  }, [db, searchQuery, selectedCategory]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchItems();
+    }, [fetchItems])
+  );
+
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems, dataVersion]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchItems();
+    setRefreshing(false);
+  };
+
+  const filteredProducts = products.filter((item) => {
+    return (
       statusFilter === 'all' ||
       (statusFilter === 'low' && item.status === 'low') ||
-      (statusFilter === 'out' && item.status === 'out');
-    return matchesSearch && matchesCategory && matchesStatus;
+      (statusFilter === 'out' && item.status === 'out')
+    );
   });
+
+  const lowStockCount = products.filter((p) => p.status === 'low' || p.status === 'out').length;
+  const totalValuation = products.reduce((acc, p) => acc + p.stockLeft * p.sellingPrice, 0);
+  const formattedValuation =
+    totalValuation >= 1000000
+      ? `₦${(totalValuation / 1000000).toFixed(2)}M`
+      : `₦${totalValuation.toLocaleString()}`;
 
   return (
     <View className="flex-1 bg-surface">
@@ -132,6 +66,7 @@ export default function InventoryScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 80 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         {/* Top Action Header */}
         <View className="flex-row items-center justify-between mb-3">
@@ -140,7 +75,7 @@ export default function InventoryScreen() {
             <View className="flex-row items-center gap-1.5 mt-0.5">
               <View className="w-1.5 h-1.5 rounded-full bg-primary" />
               <Text className="text-xs text-onSurfaceVariant">
-                184 active SKUs logged in Idumota warehouse
+                {products.length} active SKUs logged in Idumota warehouse
               </Text>
             </View>
           </View>
@@ -165,7 +100,7 @@ export default function InventoryScreen() {
               <AppIcon name="category" size={14} color={colors.primary} />
             </View>
             <View className="flex-row items-baseline gap-1 mt-1">
-              <Text className="text-base font-bold text-onSurface">184</Text>
+              <Text className="text-base font-bold text-onSurface">{products.length}</Text>
               <Text className="text-[10px] text-outline">items</Text>
             </View>
           </View>
@@ -181,7 +116,7 @@ export default function InventoryScreen() {
               <AppIcon name="warning" size={14} color={colors.error} />
             </View>
             <View className="flex-row items-baseline gap-1 mt-1">
-              <Text className="text-base font-bold text-error">7</Text>
+              <Text className="text-base font-bold text-error">{lowStockCount}</Text>
               <Text className="text-[10px] text-onSurfaceVariant">reorder</Text>
             </View>
           </Pressable>
@@ -193,7 +128,7 @@ export default function InventoryScreen() {
               </Text>
               <AppIcon name="payments" size={14} color={colors.secondary} />
             </View>
-            <Text className="text-sm font-bold text-onSurface mt-1 truncate">₦8.45M</Text>
+            <Text className="text-sm font-bold text-onSurface mt-1 truncate">{formattedValuation}</Text>
           </View>
 
           <View className="flex-1 bg-white p-2.5 rounded-xl border border-cardBorder shadow-xs">

@@ -1,112 +1,185 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, Pressable, Linking } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TextInput,
+  Pressable,
+  Linking,
+  ActivityIndicator,
+  RefreshControl,
+  Modal,
+  Alert,
+} from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSQLiteContext } from 'expo-sqlite';
 import { AppHeader } from '@/components/app-header';
 import { AppIcon } from '@/components/icon';
 import { colors } from '@/lib/theme';
-
-interface CustomerRecord {
-  id: string;
-  name: string;
-  phone: string;
-  location: string;
-  tier: string;
-  isVerified: boolean;
-  debtStatus: 'overdue' | 'due_soon' | 'settled';
-  dueText: string;
-  balance: number;
-  lastCredit: string;
-  lastPayment: string;
-  lifetimeVolume: string;
-}
-
-const mockCustomers: CustomerRecord[] = [
-  {
-    id: '1',
-    name: 'Mama Nkechi Stores',
-    phone: '+234 803 491 8820',
-    location: 'Balogun Mkt, Line 3B',
-    tier: 'Gold Tier',
-    isVerified: true,
-    debtStatus: 'overdue',
-    dueText: '12 Days Overdue',
-    balance: 145000,
-    lastCredit: '3 ctns Peak Milk (5d ago)',
-    lastPayment: '₦50,000 on Oct 02',
-    lifetimeVolume: '₦1,850,000',
-  },
-  {
-    id: '2',
-    name: 'Emeka Wholesales & Retail',
-    phone: '+234 802 119 4432',
-    location: 'Idumota Block C, Shop 14',
-    tier: 'Silver Tier',
-    isVerified: true,
-    debtStatus: 'due_soon',
-    dueText: 'Due in 3 days',
-    balance: 80000,
-    lastCredit: '10 bags Dangote Sugar',
-    lastPayment: '₦40,000 on Sep 28',
-    lifetimeVolume: '₦920,000',
-  },
-  {
-    id: '3',
-    name: 'Alhaji Bello Grains Enterprise',
-    phone: '+234 813 555 0192',
-    location: 'Mile 12 Market Stall 8',
-    tier: 'Silver Tier',
-    isVerified: false,
-    debtStatus: 'overdue',
-    dueText: '28 Days Overdue',
-    balance: 60000,
-    lastCredit: '5 packs Semovita (18d ago)',
-    lastPayment: '₦20,000 on Sep 15',
-    lifetimeVolume: '₦450,000',
-  },
-  {
-    id: '4',
-    name: 'Blessing Supermarket',
-    phone: '+234 809 332 9901',
-    location: 'Festac Town, 23 Road',
-    tier: 'Gold Tier',
-    isVerified: true,
-    debtStatus: 'settled',
-    dueText: 'Settled (Zero Balance)',
-    balance: 0,
-    lastCredit: 'Cleared invoice #SP-1080',
-    lastPayment: '₦120,000 on Oct 20',
-    lifetimeVolume: '₦3,400,000',
-  },
-];
+import { useDataRefresh } from '@/lib/db/provider';
+import {
+  getCustomers,
+  recordDebtPayment,
+  addCustomer,
+  getDashboardMetrics,
+} from '@/lib/db/queries';
+import type { Customer, DashboardMetrics } from '@/lib/db/types';
 
 export default function CustomersLedgerScreen() {
   const router = useRouter();
+  const db = useSQLiteContext();
+  const { refreshTrigger, triggerRefresh } = useDataRefresh();
+
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'owing' | 'overdue' | 'zero'>('all');
 
-  const filteredCustomers = mockCustomers.filter((item) => {
-    const matchesSearch =
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.phone.includes(searchQuery);
+  // Payment Modal State
+  const [paymentCustomer, setPaymentCustomer] = useState<Customer | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer' | 'pos'>('cash');
+  const [paymentNotes, setPaymentNotes] = useState('');
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
 
-    if (activeFilter === 'owing') {
-      return matchesSearch && item.balance > 0;
+  // Add Customer Modal State
+  const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
+  const [newCustName, setNewCustName] = useState('');
+  const [newCustPhone, setNewCustPhone] = useState('');
+  const [newCustLocation, setNewCustLocation] = useState('');
+  const [newCustCreditLimit, setNewCustCreditLimit] = useState('500000');
+  const [newCustBalance, setNewCustBalance] = useState('0');
+  const [isSubmittingCustomer, setIsSubmittingCustomer] = useState(false);
+
+  const loadData = useCallback(async () => {
+    try {
+      const [fetchedCustomers, fetchedMetrics] = await Promise.all([
+        getCustomers(db, searchQuery, activeFilter),
+        getDashboardMetrics(db),
+      ]);
+      setCustomers(fetchedCustomers);
+      setMetrics(fetchedMetrics);
+    } catch (err) {
+      console.error('Failed to load customers:', err);
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
     }
-    if (activeFilter === 'overdue') {
-      return matchesSearch && item.debtStatus === 'overdue';
+  }, [db, searchQuery, activeFilter]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData, refreshTrigger]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadData();
+  };
+
+  // Open Payment Modal
+  const openPaymentModal = (cust: Customer) => {
+    if (cust.balance <= 0) {
+      Alert.alert(
+        'Account Settled',
+        `${cust.name} currently has zero outstanding balance. Would you like to record a new sale instead?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'New Sale', onPress: () => router.push('/modal/new-sale') },
+        ]
+      );
+      return;
     }
-    if (activeFilter === 'zero') {
-      return matchesSearch && item.balance === 0;
+    setPaymentCustomer(cust);
+    setPaymentAmount(cust.balance.toString());
+    setPaymentMethod('cash');
+    setPaymentNotes('');
+  };
+
+  // Submit Payment
+  const handleConfirmPayment = async () => {
+    if (!paymentCustomer) return;
+    const amountNum = parseInt(paymentAmount.replace(/[^0-9]/g, '') || '0', 10);
+    if (!amountNum || amountNum <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid repayment amount.');
+      return;
     }
-    return matchesSearch;
-  });
+
+    setIsSubmittingPayment(true);
+    try {
+      await recordDebtPayment(
+        db,
+        paymentCustomer.id,
+        amountNum,
+        paymentMethod,
+        paymentNotes || 'Counter Debt Settlement'
+      );
+      triggerRefresh();
+      setPaymentCustomer(null);
+      Alert.alert(
+        'Payment Recorded',
+        `₦${amountNum.toLocaleString()} payment recorded for ${paymentCustomer.name}. Customer balance updated.`
+      );
+    } catch (err: any) {
+      Alert.alert('Payment Error', err?.message || 'Failed to record debt payment.');
+    } finally {
+      setIsSubmittingPayment(false);
+    }
+  };
+
+  // Submit New Customer
+  const handleCreateCustomer = async () => {
+    if (!newCustName.trim()) {
+      Alert.alert('Missing Name', 'Please enter the customer or business name.');
+      return;
+    }
+
+    setIsSubmittingCustomer(true);
+    try {
+      await addCustomer(db, {
+        name: newCustName.trim(),
+        phone: newCustPhone.trim() || '+234 800 000 0000',
+        location: newCustLocation.trim() || 'Balogun Market, Lagos',
+        creditLimit: parseInt(newCustCreditLimit.replace(/[^0-9]/g, '') || '500000', 10),
+        balance: parseInt(newCustBalance.replace(/[^0-9]/g, '') || '0', 10),
+      });
+
+      triggerRefresh();
+      setShowAddCustomerModal(false);
+      setNewCustName('');
+      setNewCustPhone('');
+      setNewCustLocation('');
+      setNewCustCreditLimit('500000');
+      setNewCustBalance('0');
+
+      Alert.alert('Success', 'Customer added to your trade directory.');
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to create customer.');
+    } finally {
+      setIsSubmittingCustomer(false);
+    }
+  };
+
+  // Compute local counts from data
+  const totalOutstanding = metrics?.creditOutstanding ?? 0;
+  const overdueCount = metrics?.overdueDebtorsCount ?? 0;
+  const owingCount = metrics?.owingCustomersCount ?? 0;
+  const totalCount = metrics?.totalCustomersCount ?? customers.length;
+  const zeroCount = Math.max(0, totalCount - owingCount);
+
+  // Compute overdue amount
+  const overdueAmount = customers
+    .filter((c) => c.debtStatus === 'overdue')
+    .reduce((sum, c) => sum + c.balance, 0);
 
   return (
     <View className="flex-1 bg-surface">
       <AppHeader />
       <ScrollView
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 80 }}
       >
         {/* Debt Ledger Summary Panel */}
@@ -121,7 +194,7 @@ export default function CustomersLedgerScreen() {
             <View className="flex-row items-center gap-1 px-2.5 py-0.5 rounded-full bg-errorContainer">
               <View className="w-1.5 h-1.5 rounded-full bg-error" />
               <Text className="text-xs font-bold text-onErrorContainer">
-                High Risk: 4 Overdue
+                {overdueCount > 0 ? `High Risk: ${overdueCount} Overdue` : 'All Accounts Good'}
               </Text>
             </View>
           </View>
@@ -131,29 +204,22 @@ export default function CustomersLedgerScreen() {
             <View className="flex-1 bg-surfaceContainerLow rounded-xl p-3">
               <Text className="text-xs text-onSurfaceVariant">Total Outstanding</Text>
               <Text className="text-2xl font-bold text-error tracking-tight mt-1">
-                ₦640,000
+                ₦{totalOutstanding.toLocaleString()}
               </Text>
               <Text className="text-[11px] text-onSurfaceVariant mt-0.5">
-                14 of 68 customers owing
+                {owingCount} of {totalCount} customers owing
               </Text>
             </View>
 
             <View className="flex-1 bg-errorContainer/40 rounded-xl p-3 border border-errorContainer">
               <Text className="text-xs text-onErrorContainer">Overdue (&gt;30 Days)</Text>
               <Text className="text-2xl font-bold text-error tracking-tight mt-1">
-                ₦285,000
+                ₦{overdueAmount.toLocaleString()}
               </Text>
               <Text className="text-[11px] text-error font-medium mt-0.5">
-                4 Accounts in default
+                {overdueCount} {overdueCount === 1 ? 'Account' : 'Accounts'} in default
               </Text>
             </View>
-          </View>
-
-          {/* Quick Progress Bar */}
-          <View className="h-2 w-full bg-surfaceContainer rounded-full overflow-hidden flex-row mb-3">
-            <View style={{ width: '44.5%' }} className="h-full bg-error" />
-            <View style={{ width: '25.5%' }} className="h-full bg-tertiary" />
-            <View style={{ width: '30%' }} className="h-full bg-secondaryContainer" />
           </View>
 
           {/* Filter Tabs */}
@@ -163,10 +229,10 @@ export default function CustomersLedgerScreen() {
             contentContainerStyle={{ gap: 6 }}
           >
             {[
-              { id: 'all', label: 'All Customers (68)' },
-              { id: 'owing', label: 'Owing Debt (14)' },
-              { id: 'overdue', label: 'Overdue (4)' },
-              { id: 'zero', label: 'Zero Balance (54)' },
+              { id: 'all', label: `All Customers (${totalCount})` },
+              { id: 'owing', label: `Owing Debt (${owingCount})` },
+              { id: 'overdue', label: `Overdue (${overdueCount})` },
+              { id: 'zero', label: `Zero Balance (${zeroCount})` },
             ].map((tab) => (
               <Pressable
                 key={tab.id}
@@ -189,19 +255,28 @@ export default function CustomersLedgerScreen() {
           </ScrollView>
         </View>
 
-        {/* Search & Bulk WhatsApp Action */}
+        {/* Search & Actions */}
         <View className="mb-4 gap-2.5">
-          <View className="relative flex-row items-center">
-            <View className="absolute left-3 z-10">
-              <AppIcon name="search" size={18} color={colors.slateMuted} />
+          <View className="flex-row items-center gap-2">
+            <View className="relative flex-1 flex-row items-center">
+              <View className="absolute left-3 z-10">
+                <AppIcon name="search" size={18} color={colors.slateMuted} />
+              </View>
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Search customer, phone, or shop line..."
+                placeholderTextColor={colors.slateMuted}
+                className="w-full h-11 pl-9 pr-4 bg-white rounded-xl border border-cardBorder text-sm text-onSurface shadow-xs"
+              />
             </View>
-            <TextInput
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Search customer, phone, or shop line..."
-              placeholderTextColor={colors.slateMuted}
-              className="w-full h-11 pl-9 pr-4 bg-white rounded-xl border border-cardBorder text-sm text-onSurface shadow-xs"
-            />
+            <Pressable
+              onPress={() => setShowAddCustomerModal(true)}
+              className="h-11 px-3.5 bg-primary rounded-xl flex-row items-center justify-center gap-1 active:bg-primaryContainer shadow-xs"
+            >
+              <AppIcon name="person_add" size={18} color="#ffffff" />
+              <Text className="text-xs font-bold text-white">Add</Text>
+            </Pressable>
           </View>
 
           {/* Bulk Action Button: Instant WhatsApp Broadcast */}
@@ -221,150 +296,410 @@ export default function CustomersLedgerScreen() {
             </View>
             <View className="flex-row items-center gap-1.5 bg-white/80 px-2.5 py-1 rounded-full">
               <Text className="text-xs font-bold text-onSecondaryContainer">
-                4 Overdue Debts
+                {overdueCount} Overdue Debts
               </Text>
               <AppIcon name="arrow_forward" size={14} color={colors.secondary} />
             </View>
           </Pressable>
         </View>
 
-        {/* Ledger Customer Cards */}
-        <View className="gap-3">
-          {filteredCustomers.map((cust) => (
-            <View
-              key={cust.id}
-              className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm relative overflow-hidden"
-            >
-              {/* Left Indicator Band */}
-              <View
-                className={`absolute left-0 top-0 bottom-0 w-1 ${
-                  cust.debtStatus === 'overdue'
-                    ? 'bg-error'
-                    : cust.debtStatus === 'due_soon'
-                    ? 'bg-tertiary'
-                    : 'bg-primary'
-                }`}
-              />
+        {/* Loading State */}
+        {isLoading && (
+          <View className="py-12 items-center justify-center">
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text className="text-xs font-medium text-onSurfaceVariant mt-2">
+              Loading credit ledger...
+            </Text>
+          </View>
+        )}
 
-              {/* Header Info */}
-              <View className="flex-row items-start justify-between mb-2 pl-1">
-                <View className="flex-row items-center gap-2.5 flex-1 mr-2">
-                  <View className="w-11 h-11 rounded-lg bg-surfaceContainer items-center justify-center">
-                    <AppIcon name="person" size={22} color={colors.primary} />
-                  </View>
-                  <View className="flex-1 min-w-0">
-                    <View className="flex-row items-center gap-1.5">
-                      <Text className="text-sm font-bold text-onSurface truncate">
-                        {cust.name}
-                      </Text>
-                      {cust.isVerified && (
-                        <AppIcon name="verified" size={15} color={colors.primary} />
-                      )}
+        {/* Empty State */}
+        {!isLoading && customers.length === 0 && (
+          <View className="bg-white rounded-xl p-8 border border-cardBorder items-center justify-center shadow-xs">
+            <View className="w-14 h-14 rounded-2xl bg-surfaceContainerLow items-center justify-center mb-3">
+              <AppIcon name="people" size={28} color={colors.slateMuted} />
+            </View>
+            <Text className="text-base font-bold text-onSurface">No customers found</Text>
+            <Text className="text-xs text-onSurfaceVariant text-center mt-1 mb-4">
+              {searchQuery
+                ? `No customers matching "${searchQuery}"`
+                : 'Your customer ledger has no records under this filter.'}
+            </Text>
+            <Pressable
+              onPress={() => setShowAddCustomerModal(true)}
+              className="px-4 py-2 bg-primary rounded-xl flex-row items-center gap-1.5 active:bg-primaryContainer"
+            >
+              <AppIcon name="person_add" size={16} color="#ffffff" />
+              <Text className="text-xs font-bold text-white">Add New Customer</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {/* Ledger Customer Cards */}
+        {!isLoading && (
+          <View className="gap-3">
+            {customers.map((cust) => (
+              <View
+                key={cust.id}
+                className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm relative overflow-hidden"
+              >
+                {/* Left Indicator Band */}
+                <View
+                  className={`absolute left-0 top-0 bottom-0 w-1 ${
+                    cust.debtStatus === 'overdue'
+                      ? 'bg-error'
+                      : cust.debtStatus === 'due_soon'
+                      ? 'bg-tertiary'
+                      : 'bg-primary'
+                  }`}
+                />
+
+                {/* Header Info */}
+                <View className="flex-row items-start justify-between mb-2 pl-1">
+                  <View className="flex-row items-center gap-2.5 flex-1 mr-2">
+                    <View className="w-11 h-11 rounded-lg bg-surfaceContainer items-center justify-center">
+                      <AppIcon name="person" size={22} color={colors.primary} />
                     </View>
-                    <View className="flex-row items-center gap-1 mt-0.5">
-                      <Text className="text-xs text-onSurfaceVariant truncate">
-                        {cust.location}
-                      </Text>
-                      <Text className="text-xs text-outline">•</Text>
-                      <View className="bg-secondaryContainer/50 px-1.5 py-0.2 rounded">
-                        <Text className="text-[10px] font-bold text-primary">
-                          {cust.tier}
+                    <View className="flex-1 min-w-0">
+                      <View className="flex-row items-center gap-1.5">
+                        <Text className="text-sm font-bold text-onSurface truncate">
+                          {cust.name}
                         </Text>
+                        {cust.isVerified && (
+                          <AppIcon name="verified" size={15} color={colors.primary} />
+                        )}
+                      </View>
+                      <View className="flex-row items-center gap-1 mt-0.5">
+                        <Text className="text-xs text-onSurfaceVariant truncate">
+                          {cust.location}
+                        </Text>
+                        <Text className="text-xs text-outline">•</Text>
+                        <View className="bg-secondaryContainer/50 px-1.5 py-0.2 rounded">
+                          <Text className="text-[10px] font-bold text-primary">
+                            {cust.tier}
+                          </Text>
+                        </View>
                       </View>
                     </View>
                   </View>
-                </View>
 
-                <View className="items-end">
-                  <Text
-                    className={`text-[10px] font-bold uppercase tracking-wider ${
-                      cust.debtStatus === 'overdue'
-                        ? 'text-error'
-                        : cust.debtStatus === 'due_soon'
-                        ? 'text-tertiary'
-                        : 'text-primary'
-                    }`}
-                  >
-                    {cust.dueText}
-                  </Text>
-                  <Text
-                    className={`text-base font-bold mt-0.5 ${
-                      cust.balance > 0 ? 'text-error' : 'text-primary'
-                    }`}
-                  >
-                    ₦{cust.balance.toLocaleString()}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Ledger Line Details */}
-              <View className="bg-surfaceContainerLow rounded-xl p-3 mb-3 gap-1.5">
-                <View className="flex-row items-center justify-between">
-                  <View className="flex-row items-center gap-1">
-                    <AppIcon name="shopping_bag" size={14} color={colors.outline} />
-                    <Text className="text-xs text-onSurfaceVariant">Last credit:</Text>
+                  <View className="items-end">
+                    <Text
+                      className={`text-[10px] font-bold uppercase tracking-wider ${
+                        cust.debtStatus === 'overdue'
+                          ? 'text-error'
+                          : cust.debtStatus === 'due_soon'
+                          ? 'text-tertiary'
+                          : 'text-primary'
+                      }`}
+                    >
+                      {cust.dueText}
+                    </Text>
+                    <Text
+                      className={`text-base font-bold mt-0.5 ${
+                        cust.balance > 0 ? 'text-error' : 'text-primary'
+                      }`}
+                    >
+                      ₦{cust.balance.toLocaleString()}
+                    </Text>
                   </View>
-                  <Text className="text-xs font-medium text-onSurface">
-                    {cust.lastCredit}
-                  </Text>
                 </View>
-                <View className="flex-row items-center justify-between">
-                  <View className="flex-row items-center gap-1">
-                    <AppIcon name="history" size={14} color={colors.outline} />
-                    <Text className="text-xs text-onSurfaceVariant">Last payment:</Text>
+
+                {/* Ledger Line Details */}
+                <View className="bg-surfaceContainerLow rounded-xl p-3 mb-3 gap-1.5">
+                  <View className="flex-row items-center justify-between">
+                    <View className="flex-row items-center gap-1">
+                      <AppIcon name="shopping_bag" size={14} color={colors.outline} />
+                      <Text className="text-xs text-onSurfaceVariant">Last credit:</Text>
+                    </View>
+                    <Text className="text-xs font-medium text-onSurface">
+                      {cust.lastCredit || 'No credit sales yet'}
+                    </Text>
                   </View>
-                  <Text className="text-xs font-semibold text-secondary">
-                    {cust.lastPayment}
-                  </Text>
+                  <View className="flex-row items-center justify-between">
+                    <View className="flex-row items-center gap-1">
+                      <AppIcon name="history" size={14} color={colors.outline} />
+                      <Text className="text-xs text-onSurfaceVariant">Last payment:</Text>
+                    </View>
+                    <Text className="text-xs font-semibold text-secondary">
+                      {cust.lastPayment || 'None recorded'}
+                    </Text>
+                  </View>
+                  <View className="flex-row items-center justify-between pt-1 border-t border-dashed border-cardBorder">
+                    <Text className="text-xs text-onSurfaceVariant">Lifetime Volume:</Text>
+                    <Text className="text-xs font-bold text-onSurface">
+                      {cust.lifetimeVolume || `₦${cust.balance.toLocaleString()}`}
+                    </Text>
+                  </View>
                 </View>
-                <View className="flex-row items-center justify-between pt-1 border-t border-dashed border-cardBorder">
-                  <Text className="text-xs text-onSurfaceVariant">Lifetime Volume:</Text>
-                  <Text className="text-xs font-bold text-onSurface">
-                    {cust.lifetimeVolume}
-                  </Text>
+
+                {/* Action Buttons (Record Payment, WhatsApp, Statement) */}
+                <View className="flex-row gap-2">
+                  <Pressable
+                    onPress={() => openPaymentModal(cust)}
+                    className="flex-1 h-9 rounded-lg bg-primary items-center justify-center flex-row gap-1 active:bg-primaryContainer"
+                  >
+                    <AppIcon name="payments" size={15} color="#ffffff" />
+                    <Text className="text-xs font-semibold text-white">Record</Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => {
+                      Linking.openURL(
+                        `https://wa.me/${cust.phone.replace(/[^0-9]/g, '')}?text=Hello%20${encodeURIComponent(
+                          cust.name
+                        )},%20this%20is%20Bamidele%20&%20Sons%20regarding%20your%20statement%20of%20₦${cust.balance.toLocaleString()}.`
+                      );
+                    }}
+                    className="flex-1 h-9 rounded-lg bg-secondaryContainer items-center justify-center flex-row gap-1 active:opacity-80"
+                  >
+                    <AppIcon name="chat" size={15} color={colors.onSecondaryContainer} />
+                    <Text className="text-xs font-semibold text-onSecondaryContainer">
+                      WhatsApp
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => router.push('/reports')}
+                    className="flex-1 h-9 rounded-lg bg-surfaceContainer items-center justify-center flex-row gap-1 active:bg-surfaceContainerHigh"
+                  >
+                    <AppIcon name="picture_as_pdf" size={15} color={colors.onSurfaceVariant} />
+                    <Text className="text-xs font-semibold text-onSurfaceVariant">
+                      Statement
+                    </Text>
+                  </Pressable>
                 </View>
               </View>
-
-              {/* Action Buttons (Record, WhatsApp, Statement) */}
-              <View className="flex-row gap-2">
-                <Pressable
-                  onPress={() => router.push('/modal/new-sale')}
-                  className="flex-1 h-9 rounded-lg bg-primary items-center justify-center flex-row gap-1 active:bg-primaryContainer"
-                >
-                  <AppIcon name="payments" size={15} color="#ffffff" />
-                  <Text className="text-xs font-semibold text-white">Record</Text>
-                </Pressable>
-
-                <Pressable
-                  onPress={() => {
-                    Linking.openURL(
-                      `https://wa.me/${cust.phone.replace(/[^0-9]/g, '')}?text=Hello%20${encodeURIComponent(
-                        cust.name
-                      )},%20this%20is%20Bamidele%20&%20Sons%20regarding%20your%20statement%20of%20₦${cust.balance.toLocaleString()}.`
-                    );
-                  }}
-                  className="flex-1 h-9 rounded-lg bg-secondaryContainer items-center justify-center flex-row gap-1 active:opacity-80"
-                >
-                  <AppIcon name="chat" size={15} color={colors.onSecondaryContainer} />
-                  <Text className="text-xs font-semibold text-onSecondaryContainer">
-                    WhatsApp
-                  </Text>
-                </Pressable>
-
-                <Pressable
-                  onPress={() => router.push('/reports')}
-                  className="flex-1 h-9 rounded-lg bg-surfaceContainer items-center justify-center flex-row gap-1 active:bg-surfaceContainerHigh"
-                >
-                  <AppIcon name="picture_as_pdf" size={15} color={colors.onSurfaceVariant} />
-                  <Text className="text-xs font-semibold text-onSurfaceVariant">
-                    Statement
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-          ))}
-        </View>
+            ))}
+          </View>
+        )}
       </ScrollView>
+
+      {/* Repayment Modal */}
+      <Modal
+        visible={Boolean(paymentCustomer)}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPaymentCustomer(null)}
+      >
+        <View className="flex-1 bg-black/50 justify-end">
+          <View className="bg-white rounded-t-3xl p-5 border-t border-cardBorder max-h-[85%]">
+            <View className="w-12 h-1 bg-outlineVariant rounded-full self-center mb-3" />
+
+            <View className="flex-row items-center justify-between mb-4">
+              <View>
+                <Text className="text-lg font-bold text-onSurface">Record Debt Payment</Text>
+                <Text className="text-xs text-onSurfaceVariant">{paymentCustomer?.name}</Text>
+              </View>
+              <Pressable
+                onPress={() => setPaymentCustomer(null)}
+                className="w-8 h-8 rounded-full bg-surfaceContainer items-center justify-center"
+              >
+                <AppIcon name="close" size={18} color={colors.onSurfaceVariant} />
+              </Pressable>
+            </View>
+
+            {/* Current Debt Card */}
+            <View className="bg-errorContainer/30 p-3 rounded-xl border border-errorContainer mb-4 flex-row items-center justify-between">
+              <View>
+                <Text className="text-xs text-onErrorContainer">Current Balance</Text>
+                <Text className="text-xl font-bold text-error">
+                  ₦{paymentCustomer?.balance.toLocaleString()}
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => setPaymentAmount(paymentCustomer?.balance.toString() || '0')}
+                className="px-2.5 py-1 bg-white rounded-lg border border-errorContainer"
+              >
+                <Text className="text-xs font-bold text-error">Pay Full</Text>
+              </Pressable>
+            </View>
+
+            {/* Amount Input */}
+            <Text className="text-xs font-semibold text-onSurfaceVariant mb-1.5">
+              Amount Paid (₦)
+            </Text>
+            <View className="flex-row items-center bg-surfaceContainerLow rounded-xl px-3 h-12 border border-cardBorder mb-4">
+              <Text className="text-xl font-bold text-primary mr-2">₦</Text>
+              <TextInput
+                value={paymentAmount}
+                onChangeText={setPaymentAmount}
+                keyboardType="numeric"
+                className="flex-1 text-xl font-bold text-onSurface p-0"
+              />
+            </View>
+
+            {/* Payment Method */}
+            <Text className="text-xs font-semibold text-onSurfaceVariant mb-1.5">
+              Payment Channel
+            </Text>
+            <View className="flex-row gap-2 mb-4">
+              {[
+                { id: 'cash', label: 'Cash' },
+                { id: 'transfer', label: 'Bank Transfer' },
+                { id: 'pos', label: 'POS Terminal' },
+              ].map((m) => (
+                <Pressable
+                  key={m.id}
+                  onPress={() => setPaymentMethod(m.id as any)}
+                  className={`flex-1 py-2 rounded-xl border items-center justify-center ${
+                    paymentMethod === m.id
+                      ? 'bg-primary border-primary'
+                      : 'bg-white border-cardBorder'
+                  }`}
+                >
+                  <Text
+                    className={`text-xs font-bold ${
+                      paymentMethod === m.id ? 'text-white' : 'text-onSurface'
+                    }`}
+                  >
+                    {m.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {/* Notes */}
+            <Text className="text-xs font-semibold text-onSurfaceVariant mb-1.5">
+              Notes (Optional)
+            </Text>
+            <TextInput
+              value={paymentNotes}
+              onChangeText={setPaymentNotes}
+              placeholder="e.g. Access Bank receipt #491"
+              placeholderTextColor={colors.outline}
+              className="w-full h-11 px-3 bg-surfaceContainerLow rounded-xl border border-cardBorder text-xs text-onSurface mb-5"
+            />
+
+            {/* Confirm Button */}
+            <Pressable
+              onPress={handleConfirmPayment}
+              disabled={isSubmittingPayment}
+              className={`w-full h-13 bg-primary rounded-xl items-center justify-center flex-row gap-2 active:bg-primaryContainer shadow-sm ${
+                isSubmittingPayment ? 'opacity-60' : ''
+              }`}
+            >
+              <AppIcon name="check_circle" size={18} color="#ffffff" />
+              <Text className="text-sm font-bold text-white">
+                {isSubmittingPayment ? 'Processing...' : 'Confirm Repayment'}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Add Customer Modal */}
+      <Modal
+        visible={showAddCustomerModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowAddCustomerModal(false)}
+      >
+        <View className="flex-1 bg-black/50 justify-end">
+          <View className="bg-white rounded-t-3xl p-5 border-t border-cardBorder max-h-[90%]">
+            <View className="w-12 h-1 bg-outlineVariant rounded-full self-center mb-3" />
+
+            <View className="flex-row items-center justify-between mb-4">
+              <View>
+                <Text className="text-lg font-bold text-onSurface">Add Trade Customer</Text>
+                <Text className="text-xs text-onSurfaceVariant">
+                  Register customer for ledger tracking and credit terms
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => setShowAddCustomerModal(false)}
+                className="w-8 h-8 rounded-full bg-surfaceContainer items-center justify-center"
+              >
+                <AppIcon name="close" size={18} color={colors.onSurfaceVariant} />
+              </Pressable>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} className="gap-3 mb-4">
+              <View>
+                <Text className="text-xs font-semibold text-onSurfaceVariant mb-1">
+                  Customer / Business Name *
+                </Text>
+                <TextInput
+                  value={newCustName}
+                  onChangeText={setNewCustName}
+                  placeholder="e.g. Iya Moria Cold Store"
+                  placeholderTextColor={colors.outline}
+                  className="w-full h-11 px-3 bg-surfaceContainerLow rounded-xl border border-cardBorder text-sm text-onSurface"
+                />
+              </View>
+
+              <View>
+                <Text className="text-xs font-semibold text-onSurfaceVariant mb-1">
+                  Phone Number
+                </Text>
+                <TextInput
+                  value={newCustPhone}
+                  onChangeText={setNewCustPhone}
+                  placeholder="+234 803 000 0000"
+                  keyboardType="phone-pad"
+                  placeholderTextColor={colors.outline}
+                  className="w-full h-11 px-3 bg-surfaceContainerLow rounded-xl border border-cardBorder text-sm text-onSurface"
+                />
+              </View>
+
+              <View>
+                <Text className="text-xs font-semibold text-onSurfaceVariant mb-1">
+                  Shop Location / Market Line
+                </Text>
+                <TextInput
+                  value={newCustLocation}
+                  onChangeText={setNewCustLocation}
+                  placeholder="e.g. Balogun Market Line 4"
+                  placeholderTextColor={colors.outline}
+                  className="w-full h-11 px-3 bg-surfaceContainerLow rounded-xl border border-cardBorder text-sm text-onSurface"
+                />
+              </View>
+
+              <View className="flex-row gap-3">
+                <View className="flex-1">
+                  <Text className="text-xs font-semibold text-onSurfaceVariant mb-1">
+                    Credit Limit (₦)
+                  </Text>
+                  <TextInput
+                    value={newCustCreditLimit}
+                    onChangeText={setNewCustCreditLimit}
+                    keyboardType="numeric"
+                    placeholder="500,000"
+                    placeholderTextColor={colors.outline}
+                    className="w-full h-11 px-3 bg-surfaceContainerLow rounded-xl border border-cardBorder text-sm text-onSurface font-bold"
+                  />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-xs font-semibold text-onSurfaceVariant mb-1">
+                    Initial Balance (₦)
+                  </Text>
+                  <TextInput
+                    value={newCustBalance}
+                    onChangeText={setNewCustBalance}
+                    keyboardType="numeric"
+                    placeholder="0"
+                    placeholderTextColor={colors.outline}
+                    className="w-full h-11 px-3 bg-surfaceContainerLow rounded-xl border border-cardBorder text-sm text-error font-bold"
+                  />
+                </View>
+              </View>
+            </ScrollView>
+
+            <Pressable
+              onPress={handleCreateCustomer}
+              disabled={isSubmittingCustomer}
+              className={`w-full h-13 bg-primary rounded-xl items-center justify-center flex-row gap-2 active:bg-primaryContainer shadow-sm ${
+                isSubmittingCustomer ? 'opacity-60' : ''
+              }`}
+            >
+              <AppIcon name="person_add" size={18} color="#ffffff" />
+              <Text className="text-sm font-bold text-white">
+                {isSubmittingCustomer ? 'Saving...' : 'Save to Directory'}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

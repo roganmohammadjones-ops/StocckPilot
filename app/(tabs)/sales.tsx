@@ -1,52 +1,54 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, ScrollView, Pressable, RefreshControl } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useSQLiteContext } from 'expo-sqlite';
 import { AppHeader } from '@/components/app-header';
 import { AppIcon } from '@/components/icon';
 import { colors } from '@/lib/theme';
+import { getSales, getDashboardMetrics } from '@/lib/db/queries';
+import type { SaleRecord, DashboardMetrics } from '@/lib/db/types';
+import { useDataRefresh } from '@/lib/db/provider';
 
 export default function SalesRegisterScreen() {
   const router = useRouter();
-  const [selectedRange, setSelectedRange] = useState<'today' | 'yesterday' | 'week'>('today');
+  const db = useSQLiteContext();
+  const { dataVersion } = useDataRefresh();
 
-  const salesTransactions = [
-    {
-      id: 'SP-1094',
-      customer: 'Walk-in Customer',
-      time: '12:44 PM',
-      amount: '₦142,900',
-      status: 'Completed',
-      channel: 'Cash',
-      itemsCount: '3 items (Sugar, Semo, Milk)',
-    },
-    {
-      id: 'SP-1093',
-      customer: 'Mama Nkechi Stores',
-      time: '11:20 AM',
-      amount: '₦85,000',
-      status: 'Completed',
-      channel: 'Bank Transfer',
-      itemsCount: '2 items (Peak Milk 2 ctn)',
-    },
-    {
-      id: 'SP-1092',
-      customer: 'Alhaji Musa Provisions',
-      time: '10:15 AM',
-      amount: '₦64,200',
-      status: 'Credit (IOU)',
-      channel: 'Credit Ledger',
-      itemsCount: '1 item (Indomie 5 ctn)',
-    },
-    {
-      id: 'SP-1091',
-      customer: 'Chukwudi Supermarket',
-      time: '09:05 AM',
-      amount: '₦194,400',
-      status: 'Completed',
-      channel: 'Moniepoint POS',
-      itemsCount: '4 items (Sugar 2, Veg Oil 2)',
-    },
-  ];
+  const [selectedRange, setSelectedRange] = useState<'today' | 'yesterday' | 'week'>('today');
+  const [sales, setSales] = useState<SaleRecord[]>([]);
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadSalesData = useCallback(async () => {
+    try {
+      const [salesList, dashMetrics] = await Promise.all([
+        getSales(db, 30),
+        getDashboardMetrics(db),
+      ]);
+      setSales(salesList);
+      setMetrics(dashMetrics);
+    } catch (e) {
+      console.error('Failed to load sales register', e);
+    }
+  }, [db]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadSalesData();
+    }, [loadSalesData])
+  );
+
+  useEffect(() => {
+    loadSalesData();
+  }, [loadSalesData, dataVersion]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadSalesData();
+    setRefreshing(false);
+  };
+
+  const todayTotal = metrics?.todaySales ?? 0;
 
   return (
     <View className="flex-1 bg-surface">
@@ -54,6 +56,7 @@ export default function SalesRegisterScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 80 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         {/* 1. Daily Sales Summary Banner */}
         <View className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm mb-4">
@@ -82,19 +85,19 @@ export default function SalesRegisterScreen() {
               </View>
             </View>
             <Text className="text-3xl font-bold text-onSurface tracking-tight">
-              ₦486,500<Text className="text-sm font-normal text-onSurfaceVariant">.00</Text>
+              ₦{todayTotal.toLocaleString()}<Text className="text-sm font-normal text-onSurfaceVariant">.00</Text>
             </Text>
             <View className="flex-row items-center justify-between pt-2 border-t border-cardBorder mt-2">
               <View className="flex-row items-center gap-1">
                 <AppIcon name="shopping_bag" size={15} color={colors.primary} />
                 <Text className="text-xs text-onSurface">
-                  <Text className="font-bold">38</Text> Completed Sales
+                  <Text className="font-bold">{sales.length}</Text> Completed Sales
                 </Text>
               </View>
               <View className="flex-row items-center gap-1">
                 <AppIcon name="payments" size={15} color={colors.secondary} />
                 <Text className="text-xs text-onSurface">
-                  Est. Profit: <Text className="font-bold text-primary">₦92,400</Text>
+                  Est. Margin: <Text className="font-bold text-primary">₦{Math.round(todayTotal * 0.18).toLocaleString()}</Text>
                 </Text>
               </View>
             </View>
@@ -234,7 +237,7 @@ export default function SalesRegisterScreen() {
             <View className="flex-row items-center gap-1.5">
               <Text className="text-base font-bold text-onSurface">Recent Sales Register</Text>
               <View className="px-2 py-0.5 rounded-full bg-surfaceContainer">
-                <Text className="text-[10px] font-bold text-onSurfaceVariant">38 Total</Text>
+                <Text className="text-[10px] font-bold text-onSurfaceVariant">{sales.length} Total</Text>
               </View>
             </View>
             <Pressable
@@ -247,7 +250,7 @@ export default function SalesRegisterScreen() {
           </View>
 
           <View className="gap-3">
-            {salesTransactions.map((tx) => (
+            {sales.map((tx) => (
               <View
                 key={tx.id}
                 className="bg-white rounded-xl p-3.5 border border-cardBorder shadow-sm"
@@ -260,41 +263,45 @@ export default function SalesRegisterScreen() {
                     <View className="flex-1 min-w-0">
                       <View className="flex-row items-center gap-1.5">
                         <Text className="text-sm font-bold text-onSurface truncate">
-                          {tx.customer}
+                          {tx.customerName || 'Walk-in Cash Customer'}
                         </Text>
                         <View
                           className={`px-1.5 py-0.2 rounded-full ${
-                            tx.status.includes('Credit')
+                            tx.paymentChannel === 'credit'
                               ? 'bg-errorContainer'
                               : 'bg-secondaryContainer'
                           }`}
                         >
                           <Text
                             className={`text-[10px] font-bold ${
-                              tx.status.includes('Credit')
+                              tx.paymentChannel === 'credit'
                                 ? 'text-onErrorContainer'
                                 : 'text-onSecondaryContainer'
                             }`}
                           >
-                            {tx.status}
+                            {tx.paymentChannel === 'credit' ? 'Credit (IOU)' : 'Completed'}
                           </Text>
                         </View>
                       </View>
                       <View className="flex-row items-center gap-1 mt-0.5">
-                        <Text className="text-xs font-bold text-primary">#{tx.id}</Text>
+                        <Text className="text-xs font-bold text-primary">#{tx.invoiceNo}</Text>
                         <Text className="text-xs text-outline">•</Text>
-                        <Text className="text-xs text-onSurfaceVariant">{tx.time}</Text>
+                        <Text className="text-xs text-onSurfaceVariant">
+                          {new Date(tx.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </Text>
                       </View>
                     </View>
                   </View>
                   <View className="items-end">
-                    <Text className="text-base font-bold text-onSurface">{tx.amount}</Text>
-                    <Text className="text-[11px] text-onSurfaceVariant">{tx.channel}</Text>
+                    <Text className="text-base font-bold text-onSurface">₦{tx.netPayable.toLocaleString()}</Text>
+                    <Text className="text-[11px] text-onSurfaceVariant capitalize">{tx.paymentChannel}</Text>
                   </View>
                 </View>
 
                 <View className="pt-2 border-t border-dashed border-cardBorder flex-row items-center justify-between">
-                  <Text className="text-xs text-onSurfaceVariant">{tx.itemsCount}</Text>
+                  <Text className="text-xs text-onSurfaceVariant">
+                    {tx.itemsSummary || `${tx.itemCount} items`}
+                  </Text>
                   <Pressable
                     onPress={() => router.push('/modal/new-sale')}
                     className="flex-row items-center gap-0.5"

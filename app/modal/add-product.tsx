@@ -9,12 +9,17 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSQLiteContext } from 'expo-sqlite';
 import { AppIcon } from '@/components/icon';
 import { colors } from '@/lib/theme';
+import { addProduct } from '@/lib/db/queries';
+import { useDataRefresh } from '@/lib/db/provider';
 
 export default function AddProductModal() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const db = useSQLiteContext();
+  const { triggerRefresh } = useDataRefresh();
 
   const [name, setName] = useState('Dangote Classic Seasoning Cubes (Carton 40x100)');
   const [sku, setSku] = useState('DNG-SEAS-40');
@@ -25,6 +30,7 @@ export default function AddProductModal() {
   const [tier2Price, setTier2Price] = useState('46800');
   const [openingStock, setOpeningStock] = useState('50');
   const [minAlert, setMinAlert] = useState('10');
+  const [saving, setSaving] = useState(false);
 
   const cost = parseFloat(costPrice) || 0;
   const retail = parseFloat(retailPrice) || 0;
@@ -38,12 +44,52 @@ export default function AddProductModal() {
 
   const isHealthyMargin = parseFloat(profitMarginPct) >= 8.0;
 
-  const handleSave = () => {
-    Alert.alert(
-      'SKU Registered',
-      `${name} (${sku}) has been saved to the Idumota catalog with ${openingStock} opening units.`,
-      [{ text: 'OK', onPress: () => router.back() }]
-    );
+  const handleSave = async () => {
+    if (!name.trim()) {
+      Alert.alert('Validation Error', 'Please enter a product name');
+      return;
+    }
+    if (!sku.trim()) {
+      Alert.alert('Validation Error', 'Please enter or generate a SKU');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await addProduct(db, {
+        name: name.trim(),
+        sku: sku.trim().toUpperCase(),
+        category: category.trim(),
+        categorySlug: category.toLowerCase().includes('grain')
+          ? 'grains'
+          : category.toLowerCase().includes('oil')
+          ? 'oils'
+          : category.toLowerCase().includes('canned')
+          ? 'canned'
+          : category.toLowerCase().includes('bev')
+          ? 'beverages'
+          : 'other',
+        stockLeft: parseFloat(openingStock) || 0,
+        stockUnit: uom.split(' ')[0].toLowerCase() || 'units',
+        minAlert: parseFloat(minAlert) || 10,
+        costPrice: cost,
+        sellingPrice: retail,
+        wholesalePrice: tier2 > 0 ? tier2 : undefined,
+        recentNote: 'Recently registered SKU',
+      });
+      triggerRefresh();
+
+      Alert.alert(
+        'SKU Registered Successfully',
+        `${name} (${sku}) has been saved to your local inventory ledger with ${openingStock} units.`,
+        [{ text: 'OK', onPress: () => router.back() }]
+      );
+    } catch (e: any) {
+      console.error('Failed to save product', e);
+      Alert.alert('Error', e?.message || 'Could not save product. Please check that the SKU is unique.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleAutoGenerateSku = () => {
@@ -350,11 +396,14 @@ export default function AddProductModal() {
         {/* Save CTA */}
         <Pressable
           onPress={handleSave}
-          className="w-full h-14 bg-primary rounded-2xl flex-row items-center justify-center gap-2 shadow-lg active:bg-primaryContainer"
+          disabled={saving}
+          className={`w-full h-14 bg-primary rounded-2xl flex-row items-center justify-center gap-2 shadow-lg active:bg-primaryContainer ${
+            saving ? 'opacity-60' : ''
+          }`}
         >
           <AppIcon name="check_circle" size={20} color="#ffffff" />
           <Text className="text-base font-bold text-white">
-            Save Product & Update Warehouse
+            {saving ? 'Saving Product...' : 'Save Product & Update Warehouse'}
           </Text>
         </Pressable>
       </ScrollView>

@@ -65,24 +65,51 @@ All checks were executed and verified locally:
 ```text
 app/                     Expo Router file-based screens and navigation
   (tabs)/                Main bottom tab navigator (Home, Sales, Inventory, Customers, More)
-  modal/                 Modal screens (e.g. new-sale)
-  _layout.tsx            Root native stack layout with global CSS import
+  modal/                 Modal screens (add-product, new-sale, record-expense)
+  _layout.tsx            Root native stack layout with SQLiteProvider & global CSS
   index.tsx              Landing screen
   setup-check.tsx        NativeWind and navigation smoke-test screen
   +not-found.tsx         Unknown route handler
 components/              Reusable UI components (Screen, AppHeader, AppIcon, etc.)
 features/                Feature domain modules
-  inventory/             Future inventory workflows
-  sales/                 Future sales workflows
-  customers/             Future customer and credit workflows
-  reports/               Future reports workflows
-lib/                     Shared utilities (formatting, theme, constants)
+lib/                     Shared utilities, themes, and database
+  db/                    Offline-first SQLite layer (stockpilot.db)
+    init.ts              Schema initialization and Nigerian market seed data
+    queries.ts           Transactional CRUD queries for products, sales, customers, expenses
+    provider.tsx         StockPilotDatabaseProvider with reactive useDataRefresh() hook
+    types.ts             TypeScript data contracts for all entities and metrics
+  theme.ts               Color tokens and theme styling
 hooks/                   Reusable React hooks
 types/                   TypeScript types
 assets/                  Images, adaptive icons, and fonts
 .agents/skills/          Official Expo developer skills
 docs/                    Setup documentation and validation reports
 ```
+
+---
+
+## 4.1. SQLite Offline-First Architecture
+
+StockPilot Nigeria operates on a local, offline-first SQLite database (`stockpilot.db`) using SDK 57's `expo-sqlite` and `expo-sqlite/web` (via `wa-sqlite.wasm`):
+
+1. **Schema & Seed Data (`lib/db/init.ts`)**:
+   - `products`: Product catalog with SKU, stock quantity, wholesale/retail prices, low-stock reorder thresholds.
+   - `customers`: Credit ledger directory with debt balances, payment terms, and verification tiers.
+   - `sales`: Transaction register with multi-payment channels (Cash, Bank Transfer, Moniepoint POS, Credit).
+   - `sale_items`: Detailed line-items linked to sales with automatic stock deduction.
+   - `debt_payments`: Audit trail of customer debt repayments.
+   - `expenses`: Store operational cash outflow logs (generator diesel, market union levies, wages).
+   - Pre-seeded with authentic Nigerian trade inventory (Dangote Sugar, Golden Penny Semovita, Peak Milk, Gino Tomato, Indomie) and market customers across Balogun, Idumota, and Mile 12.
+
+2. **Reactive State Sync (`lib/db/provider.tsx`)**:
+   - The root stack is wrapped in `StockPilotDatabaseProvider`.
+   - Any transaction (e.g. creating a sale in `new-sale.tsx`, logging an expense, recording a debt payment, or adding a product) triggers `triggerRefresh()`.
+   - All active screens (`index.tsx`, `inventory.tsx`, `sales.tsx`, `customers.tsx`) automatically re-fetch and re-render the latest aggregates with zero lag.
+
+3. **Multi-Platform Support**:
+   - Configured `metro.config.js` with `config.resolver.assetExts.push('wasm')` to support `wa-sqlite.wasm` in browser and web exports.
+   - Passed `expo export --platform all` with 19 routes compiled for iOS, Android, and Web.
+
 
 ---
 

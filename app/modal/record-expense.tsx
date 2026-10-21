@@ -9,18 +9,24 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSQLiteContext } from 'expo-sqlite';
 import { AppIcon } from '@/components/icon';
 import { colors } from '@/lib/theme';
+import { addExpense } from '@/lib/db/queries';
+import { useDataRefresh } from '@/lib/db/provider';
 
 export default function RecordExpenseModal() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const db = useSQLiteContext();
+  const { triggerRefresh } = useDataRefresh();
 
   const [category, setCategory] = useState('Generator & Diesel');
   const [amount, setAmount] = useState('7500');
   const [source, setSource] = useState<'till' | 'bank'>('till');
   const [description, setDescription] = useState('Market Union Levy & Power token payment');
   const [voucherNo, setVoucherNo] = useState('EXP-441');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const categories = [
     { id: 'diesel', label: 'Generator & Diesel', icon: 'local_gas_station' },
@@ -30,15 +36,39 @@ export default function RecordExpenseModal() {
     { id: 'repairs', label: 'Shop Maintenance', icon: 'store' },
   ];
 
-  const handleSave = () => {
-    Alert.alert(
-      'Expense Recorded',
-      `₦${parseInt(amount || '0', 10).toLocaleString()} recorded under ${category} from ${
-        source === 'till' ? 'Daily Cash Till #1' : 'Bank Transfer'
-      }.`,
-      [{ text: 'OK', onPress: () => router.back() }]
-    );
+  const handleSave = async () => {
+    const parsedAmount = parseInt(amount || '0', 10);
+    if (!parsedAmount || parsedAmount <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid expense outflow amount.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await addExpense(db, {
+        category,
+        amount: parsedAmount,
+        recipient: source === 'till' ? 'Daily Cash Till #1' : 'Bank Transfer',
+        notes: `${description} (Voucher: ${voucherNo})`,
+        paymentMethod: source === 'till' ? 'cash' : 'transfer',
+      });
+
+      triggerRefresh();
+
+      Alert.alert(
+        'Expense Recorded',
+        `₦${parsedAmount.toLocaleString()} recorded under ${category} from ${
+          source === 'till' ? 'Daily Cash Till #1' : 'Bank Transfer'
+        }.`,
+        [{ text: 'OK', onPress: () => router.back() }]
+      );
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to record expense.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
 
   return (
     <View className="flex-1 bg-surface">
@@ -212,14 +242,18 @@ export default function RecordExpenseModal() {
         {/* Submit Expense */}
         <Pressable
           onPress={handleSave}
-          className="w-full h-14 bg-error rounded-2xl flex-row items-center justify-center gap-2 shadow-lg active:opacity-90"
+          disabled={isSubmitting}
+          className={`w-full h-14 bg-error rounded-2xl flex-row items-center justify-center gap-2 shadow-lg active:opacity-90 ${
+            isSubmitting ? 'opacity-60' : ''
+          }`}
         >
           <AppIcon name="receipt" size={20} color="#ffffff" />
           <Text className="text-base font-bold text-white">
-            Record Outflow & Deduct from Register
+            {isSubmitting ? 'Recording Outflow...' : 'Record Outflow & Deduct from Register'}
           </Text>
         </Pressable>
       </ScrollView>
     </View>
+
   );
 }
