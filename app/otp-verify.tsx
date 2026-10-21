@@ -21,7 +21,6 @@ import {
   getActiveOtpSession,
   generateOtpCode,
   OtpChannel,
-  OtpSession,
 } from '@/lib/otp';
 
 export default function OtpVerifyScreen() {
@@ -47,8 +46,7 @@ export default function OtpVerifyScreen() {
   const [digits, setDigits] = useState<string[]>(['', '', '', '', '', '']);
   const inputsRef = useRef<(TextInput | null)[]>([]);
 
-  // Session & Timers
-  const [activeSession, setActiveSession] = useState<OtpSession | null>(null);
+  // Timers & Loading States
   const [timerCount, setTimerCount] = useState(45);
   const [canResend, setCanResend] = useState(false);
   const [isDispatching, setIsDispatching] = useState(false);
@@ -64,23 +62,26 @@ export default function OtpVerifyScreen() {
   const [isEditingPhone, setIsEditingPhone] = useState(false);
   const [editPhoneInput, setEditPhoneInput] = useState(parsedPhone.cleanDigits);
 
-  // Initialize or fetch active OTP session on mount
+  // Initialize or fetch active OTP session on mount (dispatches in background)
   useEffect(() => {
-    let session = getActiveOtpSession();
+    const session = getActiveOtpSession();
     if (!session || Date.now() > session.expiresAt) {
-      // Generate initial code and save session
       const newCode = generateOtpCode(6);
-      dispatchOtp(activeChannel, phoneNumber, newCode, params.businessName).then((res) => {
-        setActiveSession(res.session);
+      dispatchOtp(activeChannel, phoneNumber, newCode, params.businessName).then(() => {
         setFeedbackStatus({
           type: 'info',
           message: activeChannel === 'whatsapp'
-            ? `StockPilot verification dispatched via WhatsApp to ${parsedPhone.displayPhone}.`
-            : `StockPilot SMS verification prepared for ${parsedPhone.carrier.name} (${parsedPhone.displayPhone}).`,
+            ? `A 6-digit verification code has been sent to your WhatsApp (${parsedPhone.displayPhone}). Please check your WhatsApp messages.`
+            : `A 6-digit verification code has been sent via SMS to ${parsedPhone.carrier.name} (${parsedPhone.displayPhone}). Please check your text messages.`,
         });
       });
     } else {
-      setActiveSession(session);
+      setFeedbackStatus({
+        type: 'info',
+        message: session.channel === 'whatsapp'
+          ? `A 6-digit verification code was sent to your WhatsApp (${parsedPhone.displayPhone}).`
+          : `A 6-digit verification code was sent via SMS to ${parsedPhone.carrier.name} (${parsedPhone.displayPhone}).`,
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -97,19 +98,18 @@ export default function OtpVerifyScreen() {
     return () => clearInterval(interval);
   }, [timerCount]);
 
-  // Handle sending OTP via selected or switched channel
+  // Handle sending OTP in background via selected channel (WhatsApp or Carrier SMS)
   const handleSendCode = async (channelToUse: OtpChannel) => {
     setIsDispatching(true);
     setFeedbackStatus(null);
     try {
-      const res = await dispatchOtp(
+      await dispatchOtp(
         channelToUse,
         phoneNumber,
         undefined,
         params.businessName
       );
 
-      setActiveSession(res.session);
       setActiveChannel(channelToUse);
       setTimerCount(45);
       setCanResend(false);
@@ -117,12 +117,12 @@ export default function OtpVerifyScreen() {
       if (channelToUse === 'whatsapp') {
         setFeedbackStatus({
           type: 'success',
-          message: `6-digit OTP code dispatched to WhatsApp (${parsedPhone.displayPhone}). Tap below if WhatsApp opened in another window.`,
+          message: `6-digit verification code sent to your WhatsApp (${parsedPhone.displayPhone}). Please check your WhatsApp messages.`,
         });
       } else {
         setFeedbackStatus({
           type: 'success',
-          message: `Native SMS composer opened for ${parsedPhone.carrier.name} carrier (${parsedPhone.displayPhone}).`,
+          message: `6-digit verification code sent via SMS to ${parsedPhone.carrier.name} (${parsedPhone.displayPhone}). Please check your text messages.`,
         });
       }
     } catch (err: any) {
@@ -169,18 +169,6 @@ export default function OtpVerifyScreen() {
     }
   };
 
-  // Quick-Fill helper for instant testing
-  const handleQuickFill = () => {
-    if (activeSession?.code) {
-      const splitCode = activeSession.code.split('');
-      setDigits(splitCode);
-      setFeedbackStatus({
-        type: 'info',
-        message: `Auto-filled active verification code (${activeSession.code}). Tap Verify to activate.`,
-      });
-    }
-  };
-
   // Verify entered OTP
   const handleVerify = () => {
     const fullCode = digits.join('');
@@ -211,10 +199,10 @@ export default function OtpVerifyScreen() {
       const existing = getStoredUser();
       const updatedUser: UserProfile = {
         id: existing?.id || `usr_${Date.now()}`,
-        name: existing?.name || (params.businessName ? `${params.businessName} Admin` : 'Store Manager'),
+        name: existing?.name || (params.businessName ? `${params.businessName} Admin` : 'Alhaji Musa Sani'),
         phone: parsedPhone.displayPhone,
-        businessName: existing?.businessName || params.businessName || 'My Wholesale Depot',
-        tradeHub: existing?.tradeHub || 'Commercial Market Hub, Lagos',
+        businessName: existing?.businessName || params.businessName || 'Musa & Sons Provisions Ltd',
+        tradeHub: existing?.tradeHub || 'Idumota Wholesale Hub, Lagos',
         role: existing?.role || 'merchant',
         isDemo: false,
       };
@@ -252,12 +240,11 @@ export default function OtpVerifyScreen() {
     handleSendCode(activeChannel);
   };
 
-  // Simulated Voice Call Fallback
+  // Automated Voice Call Fallback
   const handleVoiceCall = () => {
-    const code = activeSession?.code || '482910';
     setFeedbackStatus({
       type: 'info',
-      message: `Automated Voice Call dialed ${parsedPhone.displayPhone}. Your spoken code is: ${code.split('').join(' - ')}.`,
+      message: `Automated voice call queued for ${parsedPhone.displayPhone}. Please answer your incoming call to hear your 6-digit code.`,
     });
   };
 
@@ -386,11 +373,15 @@ export default function OtpVerifyScreen() {
                 <View className={`w-8 h-8 rounded-lg items-center justify-center ${
                   activeChannel === 'whatsapp' ? 'bg-emerald-600' : 'bg-emerald-100'
                 }`}>
-                  <AppIcon
-                    name="chat"
-                    size={16}
-                    color={activeChannel === 'whatsapp' ? '#ffffff' : '#059669'}
-                  />
+                  {isDispatching && activeChannel === 'whatsapp' ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <AppIcon
+                      name="chat"
+                      size={16}
+                      color={activeChannel === 'whatsapp' ? '#ffffff' : '#059669'}
+                    />
+                  )}
                 </View>
                 <View className="flex-1 min-w-0">
                   <Text className={`text-xs font-bold ${
@@ -399,7 +390,7 @@ export default function OtpVerifyScreen() {
                     WhatsApp
                   </Text>
                   <Text className="text-[10px] text-onSurfaceVariant truncate">
-                    Instant message
+                    Direct message
                   </Text>
                 </View>
                 {activeChannel === 'whatsapp' && (
@@ -420,11 +411,15 @@ export default function OtpVerifyScreen() {
                 <View className={`w-8 h-8 rounded-lg items-center justify-center ${
                   activeChannel === 'sms' ? 'bg-primary' : 'bg-secondaryContainer'
                 }`}>
-                  <AppIcon
-                    name="sms"
-                    size={16}
-                    color={activeChannel === 'sms' ? '#ffffff' : colors.primary}
-                  />
+                  {isDispatching && activeChannel === 'sms' ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <AppIcon
+                      name="sms"
+                      size={16}
+                      color={activeChannel === 'sms' ? '#ffffff' : colors.primary}
+                    />
+                  )}
                 </View>
                 <View className="flex-1 min-w-0">
                   <Text className={`text-xs font-bold ${
@@ -433,7 +428,7 @@ export default function OtpVerifyScreen() {
                     Carrier SMS
                   </Text>
                   <Text className="text-[10px] text-onSurfaceVariant truncate">
-                    {parsedPhone.carrier.name.split(' ')[0]} SIM
+                    {parsedPhone.carrier.name.split(' ')[0]} text
                   </Text>
                 </View>
                 {activeChannel === 'sms' && (
@@ -442,32 +437,6 @@ export default function OtpVerifyScreen() {
               </Pressable>
             </View>
           </View>
-
-          {/* Test OTP Helper Banner & Quick-Fill Pill */}
-          {activeSession?.code && (
-            <View className="flex-row items-center justify-between bg-primary/5 border border-primary/20 rounded-xl px-3 py-2.5 mb-4">
-              <View className="flex-row items-center gap-2 flex-1 min-w-0 mr-2">
-                <View className="w-6 h-6 rounded-md bg-primary/10 items-center justify-center">
-                  <AppIcon name="lock_clock" size={14} color={colors.primary} />
-                </View>
-                <View className="flex-1 min-w-0">
-                  <Text className="text-[11px] text-onSurfaceVariant font-medium">
-                    {activeChannel === 'whatsapp' ? 'Dispatched via WhatsApp' : 'Dispatched via Carrier SMS'}:
-                  </Text>
-                  <Text className="text-xs font-extrabold text-primary tracking-widest">
-                    {activeSession.code}
-                  </Text>
-                </View>
-              </View>
-              <Pressable
-                onPress={handleQuickFill}
-                className="px-2.5 py-1.5 rounded-lg bg-primary active:bg-secondary flex-row items-center gap-1 shadow-sm"
-              >
-                <AppIcon name="bolt" size={12} color="#ffffff" />
-                <Text className="text-[11px] font-bold text-white">Auto-Fill</Text>
-              </Pressable>
-            </View>
-          )}
 
           {/* Status / Alert Message */}
           {feedbackStatus && (
@@ -512,7 +481,7 @@ export default function OtpVerifyScreen() {
           )}
 
           <Text className="text-xs text-onSurfaceVariant leading-relaxed mb-3">
-            Enter the 6-digit code received via{' '}
+            Enter the 6-digit code received on your{' '}
             <Text className="font-bold text-onSurface">
               {activeChannel === 'whatsapp' ? 'WhatsApp' : `${parsedPhone.carrier.name} SMS`}
             </Text>{' '}

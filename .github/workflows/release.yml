@@ -61,7 +61,7 @@ jobs:
           echo "Found APK at: $APK_PATH"
           TAG_VAL="${{ github.ref_name }}"
           if [ -z "$TAG_VAL" ] || [ "$TAG_VAL" = "main" ]; then
-            TAG_VAL="v1.0.1"
+            TAG_VAL="v1.0.3"
           fi
           cp "$APK_PATH" "build-artifacts/StockPilot-Nigeria-${TAG_VAL}.apk"
           cp "$APK_PATH" "build-artifacts/StockPilot-Nigeria.apk"
@@ -76,8 +76,8 @@ jobs:
       - name: Publish GitHub Release with APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.1' }}
-          name: "StockPilot Nigeria Production ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.1' }}"
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.3' }}
+          name: "StockPilot Nigeria Production ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.3' }}"
           body: |
             ## StockPilot Nigeria Production Release
 
