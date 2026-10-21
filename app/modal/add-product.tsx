@@ -20,14 +20,14 @@ export default function AddProductModal() {
   const db = useAppDb();
   const { triggerRefresh } = useDataRefresh();
 
-  const [name, setName] = useState('Dangote Classic Seasoning Cubes (Carton 40x100)');
-  const [sku, setSku] = useState('DNG-SEAS-40');
-  const [category, setCategory] = useState('Spices & Seasonings');
-  const [uom, setUom] = useState('Carton (Contains 40 packs)');
-  const [costPrice, setCostPrice] = useState('42000');
-  const [retailPrice, setRetailPrice] = useState('47500');
-  const [tier2Price, setTier2Price] = useState('46800');
-  const [openingStock, setOpeningStock] = useState('50');
+  const [name, setName] = useState('');
+  const [sku, setSku] = useState('');
+  const [category, setCategory] = useState('Grains & Staples');
+  const [uom, setUom] = useState('Carton');
+  const [costPrice, setCostPrice] = useState('');
+  const [retailPrice, setRetailPrice] = useState('');
+  const [tier2Price, setTier2Price] = useState('');
+  const [openingStock, setOpeningStock] = useState('');
   const [minAlert, setMinAlert] = useState('10');
   const [saving, setSaving] = useState(false);
 
@@ -169,6 +169,8 @@ export default function AddProductModal() {
             <TextInput
               value={name}
               onChangeText={setName}
+              placeholder="e.g. Peak Milk 160g (Carton 48) or Dangote Sugar 50kg"
+              placeholderTextColor={colors.outline}
               className="w-full h-11 px-3 bg-surfaceContainerLow rounded-xl border border-cardBorder text-sm text-onSurface"
             />
           </View>
@@ -191,6 +193,8 @@ export default function AddProductModal() {
               <TextInput
                 value={sku}
                 onChangeText={setSku}
+                placeholder="e.g. PEAK-CAN-48"
+                placeholderTextColor={colors.outline}
                 className="w-full h-11 px-3 bg-surfaceContainerLow rounded-xl border border-cardBorder text-xs font-mono font-bold text-onSurface"
               />
               <View className="absolute right-2.5 px-2 py-0.5 rounded bg-secondaryContainer">

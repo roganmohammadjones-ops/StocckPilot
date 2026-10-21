@@ -21,10 +21,10 @@ export default function RecordExpenseModal() {
   const { triggerRefresh } = useDataRefresh();
 
   const [category, setCategory] = useState('Generator & Diesel');
-  const [amount, setAmount] = useState('7500');
+  const [amount, setAmount] = useState('');
   const [source, setSource] = useState<'till' | 'bank'>('till');
-  const [description, setDescription] = useState('Market Union Levy & Power token payment');
-  const [voucherNo, setVoucherNo] = useState('EXP-441');
+  const [description, setDescription] = useState('');
+  const [voucherNo, setVoucherNo] = useState(`EXP-${Math.floor(100 + Math.random() * 900)}`);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const categories = [
@@ -199,7 +199,7 @@ export default function RecordExpenseModal() {
                   source === 'bank' ? 'text-white' : 'text-onSurface'
                 }`}
               >
-                Moniepoint Transfer
+                Bank Transfer / POS
               </Text>
               <Text
                 className={`text-[10px] mt-0.5 ${
