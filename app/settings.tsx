@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, Alert, ActivityIndicator } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { AppHeader } from '@/components/app-header';
 import { AppIcon } from '@/components/icon';
 import { colors } from '@/lib/theme';
 import { syncDatabaseWithCloud } from '@/lib/db/sync';
+import { logout } from '@/lib/auth';
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const db = useSQLiteContext();
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
@@ -229,6 +232,28 @@ export default function SettingsScreen() {
               </>
             )}
           </Pressable>
+        </View>
+
+        {/* Session Management */}
+        <View className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm mb-6">
+          <Text className="text-sm font-bold text-onSurface mb-1">Session & Account</Text>
+          <Text className="text-xs text-onSurfaceVariant mb-4">
+            Reset current session or return to the welcome onboarding screen.
+          </Text>
+
+          <View className="gap-2">
+            <Pressable
+              onPress={() => {
+                logout();
+                router.replace('/onboarding');
+              }}
+              className="w-full h-11 rounded-xl bg-errorContainer items-center justify-center active:opacity-90"
+            >
+              <Text className="text-xs font-bold text-onErrorContainer">
+                Sign Out & Return to Welcome Tour
+              </Text>
+            </Pressable>
+          </View>
         </View>
       </ScrollView>
     </View>

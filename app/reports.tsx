@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { AppHeader } from '@/components/app-header';
 import { AppIcon } from '@/components/icon';
+import { BrandLoader } from '@/components/brand-loader';
 import { colors } from '@/lib/theme';
 import { useDataRefresh } from '@/lib/db/provider';
 import { getFinancialReportData } from '@/lib/db/queries';
@@ -140,11 +141,11 @@ export default function ReportsScreen() {
         </ScrollView>
 
         {isLoading ? (
-          <View className="py-12 items-center justify-center">
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text className="text-xs font-medium text-onSurfaceVariant mt-2">
-              Calculating profit & loss metrics...
-            </Text>
+          <View className="py-16 items-center justify-center">
+            <BrandLoader
+              size="medium"
+              message="Calculating true landed profit & loss metrics..."
+            />
           </View>
         ) : (
           <>

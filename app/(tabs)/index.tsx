@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { AppHeader } from '@/components/app-header';
 import { AppIcon } from '@/components/icon';
+import { BrandLoader } from '@/components/brand-loader';
 import { colors } from '@/lib/theme';
 import { useDataRefresh } from '@/lib/db/provider';
 import {
@@ -99,6 +100,15 @@ export default function HomeDashboardScreen() {
   const totalProducts = metrics?.totalProductsCount ?? 0;
 
   const firstOverdue = overdueCustomers[0];
+
+  if (isLoading && !metrics) {
+    return (
+      <View className="flex-1 bg-surface">
+        <AppHeader />
+        <BrandLoader fullscreen size="large" message="Loading Lagos Market Dashboard..." />
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-surface">

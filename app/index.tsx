@@ -1,5 +1,6 @@
-import { Redirect } from 'expo-router';
+import React from 'react';
+import LaunchSplashScreen from './launch';
 
 export default function Index() {
-  return <Redirect href="/(tabs)" />;
+  return <LaunchSplashScreen />;
 }

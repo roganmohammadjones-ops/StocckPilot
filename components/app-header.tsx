@@ -3,6 +3,7 @@ import { View, Text, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { AppIcon } from './icon';
+import { BrandLogo } from './brand-logo';
 import { colors } from '@/lib/theme';
 
 interface AppHeaderProps {
@@ -41,11 +42,16 @@ export function AppHeader({ title, subtitle, showBack = false }: AppHeaderProps)
             </View>
           </View>
         ) : (
-          <View className="flex-row items-center gap-2 flex-1 min-w-0">
+          <View className="flex-row items-center gap-2.5 flex-1 min-w-0">
             {/* Brand Logo Symbol */}
-            <View className="w-8 h-8 rounded-lg bg-primary items-center justify-center">
-              <AppIcon name="warehouse" size={18} color="#ffffff" />
-            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="StockPilot Home"
+              onPress={() => router.push('/(tabs)')}
+              className="w-9 h-9 rounded-xl bg-secondaryContainer/50 items-center justify-center border border-cardBorder active:opacity-75 overflow-hidden shadow-2xs"
+            >
+              <BrandLogo variant="emblem" size={26} />
+            </Pressable>
 
             {/* Merchant Switcher & Location */}
             <View className="flex-col min-w-0">

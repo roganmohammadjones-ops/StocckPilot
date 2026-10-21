@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, Suspense } from 'react';
 import { SQLiteProvider } from 'expo-sqlite';
 import { initDatabase } from './init';
+import { BrandLoader } from '@/components/brand-loader';
 
 interface DataRefreshContextType {
   dataVersion: number;
@@ -22,13 +23,23 @@ export function StockPilotDatabaseProvider({ children }: { children: React.React
   }, []);
 
   return (
-    <SQLiteProvider databaseName="stockpilot.db" onInit={initDatabase}>
-      <DataRefreshContext.Provider
-        value={{ dataVersion, refreshTrigger: dataVersion, triggerRefresh }}
-      >
-        {children}
-      </DataRefreshContext.Provider>
-    </SQLiteProvider>
+    <Suspense
+      fallback={
+        <BrandLoader
+          fullscreen
+          size="large"
+          message="Preparing StockPilot Nigeria offline ledger..."
+        />
+      }
+    >
+      <SQLiteProvider databaseName="stockpilot.db" onInit={initDatabase} useSuspense>
+        <DataRefreshContext.Provider
+          value={{ dataVersion, refreshTrigger: dataVersion, triggerRefresh }}
+        >
+          {children}
+        </DataRefreshContext.Provider>
+      </SQLiteProvider>
+    </Suspense>
   );
 }
 

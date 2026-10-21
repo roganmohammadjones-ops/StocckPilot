@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { AppHeader } from '@/components/app-header';
 import { AppIcon } from '@/components/icon';
+import { BrandLoader } from '@/components/brand-loader';
 import { colors } from '@/lib/theme';
 import { useDataRefresh } from '@/lib/db/provider';
 import {
@@ -305,11 +306,11 @@ export default function CustomersLedgerScreen() {
 
         {/* Loading State */}
         {isLoading && (
-          <View className="py-12 items-center justify-center">
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text className="text-xs font-medium text-onSurfaceVariant mt-2">
-              Loading credit ledger...
-            </Text>
+          <View className="py-16 items-center justify-center">
+            <BrandLoader
+              size="medium"
+              message="Loading merchant credit ledger..."
+            />
           </View>
         )}
 

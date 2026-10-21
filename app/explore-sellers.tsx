@@ -433,27 +433,42 @@ export default function ExploreSellersScreen() {
             )}
 
             {/* Action Buttons */}
-            <View className="flex-row gap-2">
-              <Pressable
-                onPress={handleInwardStock}
-                disabled={isInwarding}
-                className={`flex-1 h-12 bg-primary rounded-xl items-center justify-center flex-row gap-1.5 active:bg-primaryContainer shadow-xs ${
-                  isInwarding ? 'opacity-60' : ''
-                }`}
-              >
-                <AppIcon name="inventory_2" size={18} color="#ffffff" />
-                <Text className="text-xs font-bold text-white">
-                  {isInwarding ? 'Inwarding...' : 'Inward to Warehouse'}
-                </Text>
-              </Pressable>
+            <View className="flex-col gap-2">
+              <View className="flex-row gap-2">
+                <Pressable
+                  onPress={handleInwardStock}
+                  disabled={isInwarding}
+                  className={`flex-1 h-12 bg-primary rounded-xl items-center justify-center flex-row gap-1.5 active:bg-primaryContainer shadow-xs ${
+                    isInwarding ? 'opacity-60' : ''
+                  }`}
+                >
+                  <AppIcon name="inventory_2" size={18} color="#ffffff" />
+                  <Text className="text-xs font-bold text-white">
+                    {isInwarding ? 'Inwarding...' : 'Inward to Warehouse'}
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={handleSendPOWhatsApp}
+                  className="flex-1 h-12 bg-secondaryContainer rounded-xl items-center justify-center flex-row gap-1.5 active:opacity-90 shadow-xs"
+                >
+                  <AppIcon name="chat" size={18} color={colors.onSecondaryContainer} />
+                  <Text className="text-xs font-bold text-onSecondaryContainer">
+                    WhatsApp PO
+                  </Text>
+                </Pressable>
+              </View>
 
               <Pressable
-                onPress={handleSendPOWhatsApp}
-                className="flex-1 h-12 bg-secondaryContainer rounded-xl items-center justify-center flex-row gap-1.5 active:opacity-90 shadow-xs"
+                onPress={() => {
+                  setActiveSeller(null);
+                  router.push('/order-review');
+                }}
+                className="w-full h-11 bg-surfaceContainer border border-cardBorder rounded-xl items-center justify-center flex-row gap-1.5 active:bg-surfaceContainerHigh"
               >
-                <AppIcon name="chat" size={18} color={colors.onSecondaryContainer} />
-                <Text className="text-xs font-bold text-onSecondaryContainer">
-                  WhatsApp PO
+                <AppIcon name="shopping_cart_checkout" size={16} color={colors.primary} />
+                <Text className="text-xs font-bold text-primary">
+                  Review Batch Order & Direct Checkout (Stitch Flow)
                 </Text>
               </Pressable>
             </View>

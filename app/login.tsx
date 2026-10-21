@@ -1,0 +1,273 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  ScrollView,
+  ActivityIndicator,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { AppIcon } from '@/components/icon';
+import { colors } from '@/lib/theme';
+import { loginWithCredentials, loginWithDemo } from '@/lib/auth';
+
+export default function LoginScreen() {
+  const router = useRouter();
+  const [authMode, setAuthMode] = useState<'phone' | 'email'>('phone');
+  const [phone, setPhone] = useState('08034918820');
+  const [email, setEmail] = useState('musa.provisions@stockpilot.ng');
+  const [password, setPassword] = useState('pilot1234');
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handleSignIn = async () => {
+    setIsLoading(true);
+    setErrorMessage(null);
+    try {
+      const identifier = authMode === 'phone' ? phone : email;
+      const res = await loginWithCredentials(identifier, password);
+      if (res.success) {
+        router.replace('/(tabs)');
+      } else {
+        setErrorMessage(res.error || 'Invalid credentials. Please verify your phone or email.');
+      }
+    } catch (e: any) {
+      setErrorMessage(e?.message || 'Login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleQuickDemo = async (role: 'merchant' | 'buyer') => {
+    setIsLoading(true);
+    try {
+      await loginWithDemo(role);
+      if (role === 'merchant') {
+        router.replace('/(tabs)');
+      } else {
+        router.replace('/explore-sellers');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <View className="flex-1 bg-surface">
+      {/* Top Header */}
+      <View className="flex-row items-center justify-between px-4 py-3 bg-white border-b border-cardBorder">
+        <Pressable
+          onPress={() => router.back()}
+          className="w-10 h-10 items-center justify-center rounded-full active:bg-surfaceContainer"
+        >
+          <AppIcon name="arrow_back" size={22} color={colors.onSurface} />
+        </Pressable>
+        <View className="flex-row items-center gap-1.5">
+          <View className="w-6 h-6 rounded-md bg-primary items-center justify-center">
+            <AppIcon name="inventory" size={14} color="#ffffff" />
+          </View>
+          <Text className="text-base font-bold text-onSurface">StockPilot NG</Text>
+        </View>
+        <View className="w-10" />
+      </View>
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
+      >
+        {/* Title & Badge */}
+        <View className="mb-6">
+          <View className="self-start flex-row items-center gap-1.5 px-3 py-1 rounded-full bg-secondaryContainer mb-2">
+            <View className="w-2 h-2 rounded-full bg-primary" />
+            <Text className="text-xs font-bold text-onSecondaryContainer">
+              Direct Merchant Terminal
+            </Text>
+          </View>
+          <Text className="text-2xl font-extrabold text-onSurface">Welcome Back</Text>
+          <Text className="text-sm text-onSurfaceVariant mt-1">
+            Sign in to manage your inventory, sales ledger, and customer credit recovery.
+          </Text>
+        </View>
+
+        {/* Auth Mode Tabs */}
+        <View className="flex-row bg-surfaceContainerLow p-1 rounded-xl mb-5 border border-cardBorder">
+          <Pressable
+            onPress={() => setAuthMode('phone')}
+            className={`flex-1 py-2.5 rounded-lg items-center ${
+              authMode === 'phone' ? 'bg-white shadow-sm' : ''
+            }`}
+          >
+            <Text
+              className={`text-xs font-bold ${
+                authMode === 'phone' ? 'text-primary' : 'text-onSurfaceVariant'
+              }`}
+            >
+              Phone Number (+234)
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => setAuthMode('email')}
+            className={`flex-1 py-2.5 rounded-lg items-center ${
+              authMode === 'email' ? 'bg-white shadow-sm' : ''
+            }`}
+          >
+            <Text
+              className={`text-xs font-bold ${
+                authMode === 'email' ? 'text-primary' : 'text-onSurfaceVariant'
+              }`}
+            >
+              Email / Merchant ID
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* Input Fields */}
+        <View className="gap-4 mb-5">
+          {authMode === 'phone' ? (
+            <View>
+              <Text className="text-xs font-bold text-onSurface mb-1.5">WhatsApp / Phone Number</Text>
+              <View className="flex-row items-center bg-white border border-cardBorder rounded-xl px-3 h-12 focus:border-primary">
+                <Text className="text-sm font-bold text-onSurfaceVariant mr-2">+234</Text>
+                <View className="w-px h-6 bg-cardBorder mr-2" />
+                <TextInput
+                  value={phone}
+                  onChangeText={setPhone}
+                  placeholder="803 123 4567"
+                  keyboardType="phone-pad"
+                  className="flex-1 text-sm text-onSurface font-medium outline-none"
+                />
+              </View>
+            </View>
+          ) : (
+            <View>
+              <Text className="text-xs font-bold text-onSurface mb-1.5">Email Address</Text>
+              <View className="bg-white border border-cardBorder rounded-xl px-3 h-12 justify-center focus:border-primary">
+                <TextInput
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="musa@stockpilot.ng"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  className="text-sm text-onSurface font-medium outline-none"
+                />
+              </View>
+            </View>
+          )}
+
+          <View>
+            <View className="flex-row justify-between items-center mb-1.5">
+              <Text className="text-xs font-bold text-onSurface">Password / Security PIN</Text>
+              <Pressable onPress={() => router.push('/otp-verify')}>
+                <Text className="text-xs font-bold text-primary">Login via WhatsApp OTP</Text>
+              </Pressable>
+            </View>
+            <View className="bg-white border border-cardBorder rounded-xl px-3 h-12 justify-center focus:border-primary">
+              <TextInput
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Enter 4-6 digit pin or password"
+                secureTextEntry
+                className="text-sm text-onSurface font-medium outline-none"
+              />
+            </View>
+          </View>
+        </View>
+
+        {/* Error Alert */}
+        {errorMessage && (
+          <View className="p-3 rounded-xl bg-errorContainer mb-4 flex-row items-center gap-2">
+            <AppIcon name="warning" size={18} color={colors.error} />
+            <Text className="text-xs text-onErrorContainer flex-1 font-medium">{errorMessage}</Text>
+          </View>
+        )}
+
+        {/* Sign In Button */}
+        <Pressable
+          onPress={handleSignIn}
+          disabled={isLoading}
+          className="w-full h-12 rounded-xl bg-primary items-center justify-center flex-row gap-2 active:bg-secondary shadow-md mb-6"
+        >
+          {isLoading ? (
+            <ActivityIndicator color="#ffffff" size="small" />
+          ) : (
+            <>
+              <Text className="text-white font-bold text-sm">Sign In to Workspace</Text>
+              <AppIcon name="arrow_forward" size={18} color="#ffffff" />
+            </>
+          )}
+        </Pressable>
+
+        {/* One-Tap Demo Access Divider */}
+        <View className="flex-row items-center gap-3 mb-4">
+          <View className="flex-1 h-px bg-cardBorder" />
+          <Text className="text-xs font-bold text-onSurfaceVariant uppercase tracking-wider">
+            Or One-Tap Demo Access
+          </Text>
+          <View className="flex-1 h-px bg-cardBorder" />
+        </View>
+
+        {/* Demo Buttons */}
+        <View className="gap-2.5 mb-6">
+          <Pressable
+            onPress={() => handleQuickDemo('merchant')}
+            className="p-3.5 rounded-xl bg-white border border-cardBorder flex-row items-center justify-between active:bg-surfaceContainer shadow-sm"
+          >
+            <View className="flex-row items-center gap-3 flex-1 min-w-0 mr-2">
+              <View className="w-10 h-10 rounded-xl bg-secondaryContainer items-center justify-center">
+                <AppIcon name="warehouse" size={20} color={colors.secondary} />
+              </View>
+              <View className="flex-1 min-w-0">
+                <Text className="text-xs font-bold text-onSurface truncate">
+                  Alhaji Musa Sani (Provisions Merchant)
+                </Text>
+                <Text className="text-[11px] text-onSurfaceVariant truncate">
+                  Idumota Wholesale Depot • ₦1.4M Daily Sales
+                </Text>
+              </View>
+            </View>
+            <View className="px-2 py-1 rounded bg-secondaryContainer">
+              <Text className="text-[10px] font-bold text-onSecondaryContainer">Quick Test</Text>
+            </View>
+          </Pressable>
+
+          <Pressable
+            onPress={() => handleQuickDemo('buyer')}
+            className="p-3.5 rounded-xl bg-white border border-cardBorder flex-row items-center justify-between active:bg-surfaceContainer shadow-sm"
+          >
+            <View className="flex-row items-center gap-3 flex-1 min-w-0 mr-2">
+              <View className="w-10 h-10 rounded-xl bg-surfaceContainerHigh items-center justify-center">
+                <AppIcon name="shopping_bag" size={20} color={colors.tertiary} />
+              </View>
+              <View className="flex-1 min-w-0">
+                <Text className="text-xs font-bold text-onSurface truncate">
+                  TopChoice Bulk Buyer
+                </Text>
+                <Text className="text-[11px] text-onSurfaceVariant truncate">
+                  Trade Fair Wholesale Hub • Explore Market Stalls
+                </Text>
+              </View>
+            </View>
+            <View className="px-2 py-1 rounded bg-surfaceContainer">
+              <Text className="text-[10px] font-bold text-onSurface">Buyer Mode</Text>
+            </View>
+          </Pressable>
+        </View>
+
+        {/* New Merchant Signup Callout */}
+        <View className="items-center">
+          <Text className="text-xs text-onSurfaceVariant">
+            New to StockPilot?{' '}
+            <Text
+              onPress={() => router.push('/signup')}
+              className="text-primary font-bold underline"
+            >
+              Create Free Business Account
+            </Text>
+          </Text>
+        </View>
+      </ScrollView>
+    </View>
+  );
+}

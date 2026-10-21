@@ -6,6 +6,7 @@ import { AppHeader } from '@/components/app-header';
 import { AppIcon } from '@/components/icon';
 import { colors } from '@/lib/theme';
 import { useDataRefresh } from '@/lib/db/provider';
+import { getStoredUser, logout } from '@/lib/auth';
 
 interface MenuItem {
   title: string;
@@ -27,6 +28,7 @@ export default function MoreHubScreen() {
   const { dataVersion } = useDataRefresh();
   const [productCount, setProductCount] = useState(0);
   const [customerCount, setCustomerCount] = useState(0);
+  const user = getStoredUser();
 
   useEffect(() => {
     async function loadData() {
@@ -43,6 +45,11 @@ export default function MoreHubScreen() {
     }
     loadData();
   }, [db, dataVersion]);
+
+  const handleLogout = () => {
+    logout();
+    router.replace('/onboarding');
+  };
 
   const menuSections: MenuSection[] = [
     {
@@ -74,11 +81,48 @@ export default function MoreHubScreen() {
       ],
     },
     {
+      title: 'Stitch Flow & Experience',
+      items: [
+        {
+          title: 'Launch & Splash Screen',
+          description: 'View the animated fintech offline initialization and node telemetry',
+          icon: 'bolt',
+          iconColor: colors.primary,
+          route: '/launch',
+          badge: 'Stitch Screen',
+        },
+        {
+          title: 'Welcome & Onboarding Tour',
+          description: 'Value proposition, live register snapshot & Lagos trade pillars',
+          icon: 'inventory',
+          iconColor: colors.secondary,
+          route: '/onboarding',
+          badge: 'Stitch Screen',
+        },
+        {
+          title: 'Wholesale Cart & Order Review',
+          description: 'Dangote Sugar & Peak Milk bulk purchase review with depot pickup',
+          icon: 'receipt_long',
+          iconColor: colors.tertiary,
+          route: '/order-review',
+          badge: 'Stitch Screen',
+        },
+        {
+          title: 'Phone OTP Verification',
+          description: 'WhatsApp & SMS 6-digit identity verification and trade credits',
+          icon: 'chat',
+          iconColor: colors.primary,
+          route: '/otp-verify',
+          badge: 'Stitch Screen',
+        },
+      ],
+    },
+    {
       title: 'Store Administration',
       items: [
         {
-          title: 'Store Settings & Branches',
-          description: 'Manage Idumota warehouse, cash till accounts & POS slips',
+          title: 'Store Settings & Cloud Sync',
+          description: 'Manage Idumota warehouse, cash till accounts & Supabase mirror',
           icon: 'warehouse',
           iconColor: colors.tertiary,
           route: '/settings',
@@ -99,7 +143,7 @@ export default function MoreHubScreen() {
       <AppHeader />
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 80 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 100 }}
       >
         {/* Merchant Profile Snapshot */}
         <View className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm mb-5">
@@ -110,17 +154,17 @@ export default function MoreHubScreen() {
             <View className="flex-1 min-w-0">
               <View className="flex-row items-center gap-1.5">
                 <Text className="text-base font-bold text-onSurface truncate">
-                  Bamidele & Sons Provisions
+                  {user?.businessName || 'Bamidele & Sons Provisions'}
                 </Text>
                 <AppIcon name="verified" size={16} color={colors.primary} />
               </View>
-              <Text className="text-xs text-onSurfaceVariant mt-0.5">
-                Idumota Wholesale Depot • Counter Till #1
+              <Text className="text-xs text-onSurfaceVariant mt-0.5 truncate">
+                {user?.tradeHub || 'Idumota Wholesale Depot • Counter Till #1'}
               </Text>
               <View className="flex-row items-center gap-2 mt-1 flex-wrap">
                 <View className="px-2 py-0.5 rounded bg-secondaryContainer">
                   <Text className="text-[10px] font-bold text-onSecondaryContainer">
-                    Tier 1 Merchant
+                    {user?.isDemo ? 'Demo Mode' : 'Tier 1 Merchant'}
                   </Text>
                 </View>
                 <Text className="text-[11px] text-outline">
@@ -173,8 +217,27 @@ export default function MoreHubScreen() {
           </View>
         ))}
 
+        {/* Session Actions: Switch Account / Sign Out */}
+        <View className="mb-6 gap-2">
+          <Pressable
+            onPress={() => router.push('/login')}
+            className="w-full h-11 rounded-xl bg-white border border-cardBorder items-center justify-center active:bg-surfaceContainer shadow-xs"
+          >
+            <Text className="text-xs font-bold text-primary">Switch Account / Sign In</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={handleLogout}
+            className="w-full h-11 rounded-xl bg-errorContainer items-center justify-center active:opacity-90 shadow-xs"
+          >
+            <Text className="text-xs font-bold text-onErrorContainer">
+              Log Out & Return to Onboarding
+            </Text>
+          </Pressable>
+        </View>
+
         {/* System Version & Node ID */}
-        <View className="items-center py-4">
+        <View className="items-center py-2">
           <Text className="text-xs font-bold text-onSurfaceVariant">
             StockPilot Nigeria Business Manager
           </Text>
