@@ -2,11 +2,17 @@ import '../global.css';
 
 import { Stack } from 'expo-router/stack';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts } from 'expo-font';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { StockPilotDatabaseProvider } from '@/lib/db/provider';
 
 export const unstable_settings = { initialRouteName: 'index' };
 
 export default function RootLayout() {
+  useFonts({
+    ...MaterialIcons.font,
+  });
+
   return (
     <StockPilotDatabaseProvider>
       <StatusBar style="dark" />

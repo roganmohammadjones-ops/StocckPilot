@@ -9,6 +9,7 @@ import {
   RefreshControl,
   Modal,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { AppHeader } from '@/components/app-header';
@@ -16,18 +17,22 @@ import { AppIcon } from '@/components/icon';
 import { BrandLoader } from '@/components/brand-loader';
 import { colors } from '@/lib/theme';
 import { useDataRefresh, useAppDb } from '@/lib/db/provider';
+import { useStoreProfile } from '@/lib/store-profile';
 import {
   getCustomers,
   recordDebtPayment,
   addCustomer,
   getDashboardMetrics,
+  getSales,
 } from '@/lib/db/queries';
 import type { Customer, DashboardMetrics } from '@/lib/db/types';
+import { sharePaymentReceiptPdf, shareStatementPdf } from '@/lib/receipt';
 
 export default function CustomersLedgerScreen() {
   const router = useRouter();
   const db = useAppDb();
   const { refreshTrigger, triggerRefresh } = useDataRefresh();
+  const store = useStoreProfile();
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
@@ -52,6 +57,7 @@ export default function CustomersLedgerScreen() {
   const [newCustCreditLimit, setNewCustCreditLimit] = useState('500000');
   const [newCustBalance, setNewCustBalance] = useState('0');
   const [isSubmittingCustomer, setIsSubmittingCustomer] = useState(false);
+  const [generatingCustId, setGeneratingCustId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -115,16 +121,59 @@ export default function CustomersLedgerScreen() {
         paymentMethod,
         paymentNotes || 'Counter Debt Settlement'
       );
+      const currentCust = { ...paymentCustomer };
+      const remaining = Math.max(0, currentCust.balance - amountNum);
       triggerRefresh();
       setPaymentCustomer(null);
+
       Alert.alert(
-        'Payment Recorded',
-        `₦${amountNum.toLocaleString()} payment recorded for ${paymentCustomer.name}. Customer balance updated.`
+        'Payment Recorded Successfully',
+        `₦${amountNum.toLocaleString()} payment recorded for ${currentCust.name}.\nNew Remaining Balance: ₦${remaining.toLocaleString()}.`,
+        [
+          {
+            text: 'Send WhatsApp Voucher',
+            onPress: () => {
+              const cleanPhone = currentCust.phone.replace(/[^0-9]/g, '');
+              const msg = `*PAYMENT ACKNOWLEDGMENT*%0A` +
+                `*Store:* ${encodeURIComponent(store.businessName)}%0A` +
+                `*Customer:* ${encodeURIComponent(currentCust.name)}%0A` +
+                `*Amount Received:* ₦${amountNum.toLocaleString()}%0A` +
+                `*Channel:* ${paymentMethod.toUpperCase()}%0A` +
+                `*Remaining Balance:* ₦${remaining.toLocaleString()}%0A` +
+                `Payment credited to ledger. Thank you!`;
+              Linking.openURL(`https://wa.me/${cleanPhone}?text=${msg}`);
+            },
+          },
+          {
+            text: 'Print Voucher PDF',
+            onPress: () => {
+              sharePaymentReceiptPdf(currentCust, amountNum, paymentMethod, remaining).catch((err) => {
+                Alert.alert('Printing Error', err?.message || 'Could not print voucher.');
+              });
+            },
+          },
+          {
+            text: 'Done',
+            style: 'cancel',
+          },
+        ]
       );
     } catch (err: any) {
       Alert.alert('Payment Error', err?.message || 'Failed to record debt payment.');
     } finally {
       setIsSubmittingPayment(false);
+    }
+  };
+
+  const handleShareCustomerStatement = async (cust: Customer) => {
+    try {
+      setGeneratingCustId(cust.id);
+      const customerSales = await getSales(db, 30, cust.id);
+      await shareStatementPdf(cust, customerSales);
+    } catch (e: any) {
+      Alert.alert('Statement Error', e?.message || 'Could not generate statement PDF.');
+    } finally {
+      setGeneratingCustId(null);
     }
   };
 
@@ -282,7 +331,9 @@ export default function CustomersLedgerScreen() {
           <Pressable
             onPress={() => {
               Linking.openURL(
-                'https://wa.me/?text=StockPilot%20Automated%20Reminder:%20Dear%20esteemed%20trade%20partners,%20this%20is%20a%20courtesy%20reminder%20to%20reconcile%20pending%20balances%20with%20Bamidele%20&%20Sons%20Provisions.'
+                `https://wa.me/?text=StockPilot%20Automated%20Reminder:%20Dear%20esteemed%20trade%20partners,%20this%20is%20a%20courtesy%20reminder%20to%20reconcile%20pending%20balances%20with%20${encodeURIComponent(
+                  store.businessName
+                )}.`
               );
             }}
             className="w-full h-12 bg-secondaryContainer rounded-xl px-4 flex-row items-center justify-between shadow-xs active:opacity-90"
@@ -447,7 +498,9 @@ export default function CustomersLedgerScreen() {
                       Linking.openURL(
                         `https://wa.me/${cust.phone.replace(/[^0-9]/g, '')}?text=Hello%20${encodeURIComponent(
                           cust.name
-                        )},%20this%20is%20Bamidele%20&%20Sons%20regarding%20your%20statement%20of%20₦${cust.balance.toLocaleString()}.`
+                        )},%20this%20is%20${encodeURIComponent(
+                          store.businessName
+                        )}%20regarding%20your%20statement%20of%20₦${cust.balance.toLocaleString()}.`
                       );
                     }}
                     className="flex-1 h-9 rounded-lg bg-secondaryContainer items-center justify-center flex-row gap-1 active:opacity-80"
@@ -459,13 +512,20 @@ export default function CustomersLedgerScreen() {
                   </Pressable>
 
                   <Pressable
-                    onPress={() => router.push('/reports')}
+                    disabled={generatingCustId === cust.id}
+                    onPress={() => handleShareCustomerStatement(cust)}
                     className="flex-1 h-9 rounded-lg bg-surfaceContainer items-center justify-center flex-row gap-1 active:bg-surfaceContainerHigh"
                   >
-                    <AppIcon name="picture_as_pdf" size={15} color={colors.onSurfaceVariant} />
-                    <Text className="text-xs font-semibold text-onSurfaceVariant">
-                      Statement
-                    </Text>
+                    {generatingCustId === cust.id ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
+                      <>
+                        <AppIcon name="picture_as_pdf" size={15} color={colors.onSurfaceVariant} />
+                        <Text className="text-xs font-semibold text-onSurfaceVariant">
+                          Statement
+                        </Text>
+                      </>
+                    )}
                   </Pressable>
                 </View>
               </View>

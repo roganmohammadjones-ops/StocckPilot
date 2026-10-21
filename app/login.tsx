@@ -159,7 +159,17 @@ export default function LoginScreen() {
           <View>
             <View className="flex-row justify-between items-center mb-1.5">
               <Text className="text-xs font-bold text-onSurface">Password / Security PIN</Text>
-              <Pressable onPress={() => router.push('/otp-verify')}>
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: '/otp-verify',
+                    params: {
+                      phone: authMode === 'phone' ? (phone.startsWith('+') ? phone : `+234 ${phone.replace(/^0+/, '')}`) : undefined,
+                      source: 'login',
+                    },
+                  })
+                }
+              >
                 <Text className="text-xs font-bold text-primary">Login via WhatsApp OTP</Text>
               </Pressable>
             </View>

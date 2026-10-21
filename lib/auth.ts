@@ -35,27 +35,50 @@ export const DEMO_BUYER: UserProfile = {
   isDemo: true,
 };
 
-export function getStoredUser(): UserProfile | null {
+let inMemoryUserSession: UserProfile | null = null;
+
+function getSafeLocalStorage(): Storage | null {
   try {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const data = window.localStorage.getItem(AUTH_STORAGE_KEY);
+    if (typeof window === 'undefined') return null;
+    if (!('localStorage' in window)) return null;
+    const storage = window.localStorage;
+    if (!storage) return null;
+    const testKey = '__stockpilot_test__';
+    storage.setItem(testKey, '1');
+    storage.removeItem(testKey);
+    return storage;
+  } catch {
+    return null;
+  }
+}
+
+export function getStoredUser(): UserProfile | null {
+  if (inMemoryUserSession) return inMemoryUserSession;
+  try {
+    const storage = getSafeLocalStorage();
+    if (storage) {
+      const data = storage.getItem(AUTH_STORAGE_KEY);
       if (data) {
-        return JSON.parse(data);
+        const parsed = JSON.parse(data);
+        inMemoryUserSession = parsed;
+        return parsed;
       }
     }
   } catch (e) {
     console.warn('Failed to read auth session from storage', e);
   }
-  return null;
+  return inMemoryUserSession;
 }
 
 export function saveStoredUser(user: UserProfile | null): void {
+  inMemoryUserSession = user;
   try {
-    if (typeof window !== 'undefined' && window.localStorage) {
+    const storage = getSafeLocalStorage();
+    if (storage) {
       if (user) {
-        window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+        storage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
       } else {
-        window.localStorage.removeItem(AUTH_STORAGE_KEY);
+        storage.removeItem(AUTH_STORAGE_KEY);
       }
     }
   } catch (e) {

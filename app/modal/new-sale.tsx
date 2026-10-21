@@ -8,6 +8,7 @@ import {
   Alert,
   Linking,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,6 +17,7 @@ import { colors } from '@/lib/theme';
 import { createSale, getProducts, getCustomers } from '@/lib/db/queries';
 import { useDataRefresh, useAppDb } from '@/lib/db/provider';
 import type { Product, Customer } from '@/lib/db/types';
+import { printReceipt, shareReceiptPdf } from '@/lib/receipt';
 
 interface CartItem {
   id: string;
@@ -82,11 +84,23 @@ export default function NewSaleModal() {
   const [tenderedAmount, setTenderedAmount] = useState('130,000');
   const [discount, setDiscount] = useState(500);
 
-  // Modals for SKU picker and Barcode Scanner
+  // Modals for SKU picker, Barcode Scanner, and Sale Completion
   const [showAddSkuModal, setShowAddSkuModal] = useState(false);
   const [showBarcodeScannerModal, setShowBarcodeScannerModal] = useState(false);
   const [skuSearchQuery, setSkuSearchQuery] = useState('');
   const [barcodeInput, setBarcodeInput] = useState('');
+  const [completedSale, setCompletedSale] = useState<{
+    invoiceNo: string;
+    netPayable: number;
+    customerName: string;
+    paymentChannel: 'cash' | 'transfer' | 'pos' | 'credit';
+    amountTendered?: number;
+    changeReturned?: number;
+    totalAmount: number;
+    discountAmount: number;
+    items: CartItem[];
+  } | null>(null);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   // Load products and customers from SQLite
   useEffect(() => {
@@ -220,35 +234,110 @@ export default function NewSaleModal() {
 
       triggerRefresh();
 
-      Alert.alert(
-        'Sale Recorded Successfully',
-        `Invoice #${invoiceNo} for ₦${netPayable.toLocaleString()} has been committed to the local ledger.`,
-        [
-          {
-            text: 'Send WhatsApp Slip',
-            onPress: () => {
-              const customerPhone = phoneNumber.replace(/[^0-9]/g, '');
-              const msg = `*RECEIPT #${invoiceNo}*%0A` +
-                `*Store:* Bamidele & Sons Provisions%0A` +
-                `*Total Paid:* ₦${netPayable.toLocaleString()}%0A` +
-                `*Items:* ${cart.map((c) => `${c.name} x${c.quantity}`).join(', ')}%0A` +
-                `Thank you for your patronage!`;
-              Linking.openURL(`https://wa.me/${customerPhone}?text=${msg}`);
-              router.back();
-            },
-          },
-          {
-            text: 'Done',
-            onPress: () => router.back(),
-          },
-        ]
-      );
+      setCompletedSale({
+        invoiceNo,
+        netPayable,
+        customerName:
+          customerType === 'registered'
+            ? selectedCustomer?.name || 'Registered Customer'
+            : 'Walk-in Cash Customer',
+        paymentChannel,
+        amountTendered: paymentChannel === 'cash' ? parsedTendered : undefined,
+        changeReturned: paymentChannel === 'cash' ? Math.max(0, changeDue) : undefined,
+        totalAmount: grossSubtotal,
+        discountAmount: discount,
+        items: [...cart],
+      });
     } catch (err: any) {
       console.error('Failed to create sale', err);
       Alert.alert('Error', err?.message || 'Could not record sale. Please try again.');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handlePrintSaleReceipt = async () => {
+    if (!completedSale) return;
+    try {
+      setIsPrinting(true);
+      await printReceipt(
+        {
+          id: `sale_${Date.now()}`,
+          invoiceNo: completedSale.invoiceNo,
+          customerName: completedSale.customerName,
+          totalAmount: completedSale.totalAmount,
+          discountAmount: completedSale.discountAmount,
+          netPayable: completedSale.netPayable,
+          paymentChannel: completedSale.paymentChannel,
+          amountTendered: completedSale.amountTendered,
+          changeReturned: completedSale.changeReturned,
+          createdAt: new Date().toISOString(),
+          itemCount: completedSale.items.length,
+        },
+        completedSale.items.map((it) => ({
+          productName: it.name,
+          sku: it.sku,
+          quantity: it.quantity,
+          unitPrice: it.unitPrice,
+          totalPrice: it.quantity * it.unitPrice,
+        }))
+      );
+    } catch (e: any) {
+      Alert.alert('Printing Error', e?.message || 'Could not print receipt.');
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
+  const handleShareSalePdf = async () => {
+    if (!completedSale) return;
+    try {
+      setIsPrinting(true);
+      await shareReceiptPdf(
+        {
+          id: `sale_${Date.now()}`,
+          invoiceNo: completedSale.invoiceNo,
+          customerName: completedSale.customerName,
+          totalAmount: completedSale.totalAmount,
+          discountAmount: completedSale.discountAmount,
+          netPayable: completedSale.netPayable,
+          paymentChannel: completedSale.paymentChannel,
+          amountTendered: completedSale.amountTendered,
+          changeReturned: completedSale.changeReturned,
+          createdAt: new Date().toISOString(),
+          itemCount: completedSale.items.length,
+        },
+        completedSale.items.map((it) => ({
+          productName: it.name,
+          sku: it.sku,
+          quantity: it.quantity,
+          unitPrice: it.unitPrice,
+          totalPrice: it.quantity * it.unitPrice,
+        }))
+      );
+    } catch (e: any) {
+      Alert.alert('PDF Error', e?.message || 'Could not generate PDF receipt.');
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
+  const handleShareSaleWhatsApp = () => {
+    if (!completedSale) return;
+    const customerPhone = phoneNumber.replace(/[^0-9]/g, '');
+    const msg =
+      `*RECEIPT #${completedSale.invoiceNo}*%0A` +
+      `*Store:* Bamidele & Sons Provisions%0A` +
+      `*Total Paid:* ₦${completedSale.netPayable.toLocaleString()}%0A` +
+      `*Channel:* ${completedSale.paymentChannel.toUpperCase()}%0A` +
+      `*Items:* ${completedSale.items.map((c) => `${c.name} x${c.quantity}`).join(', ')}%0A` +
+      `Thank you for your patronage!`;
+    Linking.openURL(`https://wa.me/${customerPhone}?text=${msg}`);
+  };
+
+  const handleStartNextSale = () => {
+    setCart([]);
+    setCompletedSale(null);
   };
 
   const filteredCatalog = products.filter(
@@ -789,6 +878,120 @@ export default function NewSaleModal() {
               >
                 <Text className="text-xs font-bold text-white">Scan SKU</Text>
               </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 3. Sale Completion & Receipt Modal */}
+      <Modal
+        visible={!!completedSale}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setCompletedSale(null)}
+      >
+        <View className="flex-1 bg-black/60 justify-end">
+          <View className="bg-white rounded-t-3xl max-h-[85%] p-5 border-t border-cardBorder shadow-2xl">
+            {/* Success Celebration Header */}
+            <View className="items-center text-center pb-4 border-b border-cardBorder mb-4">
+              <View className="w-16 h-16 rounded-full bg-secondaryContainer items-center justify-center mb-2 shadow-sm">
+                <AppIcon name="check_circle" size={36} color={colors.primary} />
+              </View>
+              <Text className="text-xl font-bold text-onSurface">Sale Successfully Recorded!</Text>
+              <Text className="text-xs text-onSurfaceVariant mt-0.5">
+                Committed to encrypted local SQLite ledger
+              </Text>
+              <View className="mt-2 px-3 py-1 bg-surfaceContainerLow rounded-full border border-cardBorder">
+                <Text className="text-xs font-mono font-bold text-primary">
+                  Invoice #{completedSale?.invoiceNo}
+                </Text>
+              </View>
+            </View>
+
+            {/* Transaction Readout */}
+            <View className="bg-surfaceContainerLow p-3.5 rounded-2xl mb-4 gap-2">
+              <View className="flex-row justify-between">
+                <Text className="text-xs text-onSurfaceVariant">Customer:</Text>
+                <Text className="text-xs font-bold text-onSurface">
+                  {completedSale?.customerName}
+                </Text>
+              </View>
+              <View className="flex-row justify-between">
+                <Text className="text-xs text-onSurfaceVariant">Payment Channel:</Text>
+                <Text className="text-xs font-bold text-primary uppercase">
+                  {completedSale?.paymentChannel}
+                </Text>
+              </View>
+              <View className="flex-row justify-between">
+                <Text className="text-xs text-onSurfaceVariant">Items Count:</Text>
+                <Text className="text-xs font-bold text-onSurface">
+                  {completedSale?.items.length} SKUs
+                </Text>
+              </View>
+              <View className="flex-row justify-between pt-2 border-t border-cardBorder">
+                <Text className="text-sm font-bold text-onSurface">Total Amount Paid:</Text>
+                <Text className="text-lg font-black text-primary">
+                  ₦{completedSale?.netPayable.toLocaleString()}
+                </Text>
+              </View>
+            </View>
+
+            {/* Action Buttons */}
+            <View className="gap-2.5">
+              <View className="flex-row gap-2">
+                <Pressable
+                  disabled={isPrinting}
+                  onPress={handlePrintSaleReceipt}
+                  className="flex-1 h-12 bg-primary rounded-xl flex-row items-center justify-center gap-2 active:bg-primaryContainer shadow-sm"
+                >
+                  {isPrinting ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <>
+                      <AppIcon name="print" size={18} color="#ffffff" />
+                      <Text className="text-xs font-bold text-white">Print Thermal</Text>
+                    </>
+                  )}
+                </Pressable>
+
+                <Pressable
+                  disabled={isPrinting}
+                  onPress={handleShareSalePdf}
+                  className="flex-1 h-12 bg-surfaceContainer rounded-xl flex-row items-center justify-center gap-2 active:bg-surfaceContainerHigh"
+                >
+                  <AppIcon name="picture_as_pdf" size={18} color={colors.onSurface} />
+                  <Text className="text-xs font-bold text-onSurface">Share PDF</Text>
+                </Pressable>
+              </View>
+
+              <Pressable
+                onPress={handleShareSaleWhatsApp}
+                className="w-full h-12 bg-secondaryContainer rounded-xl flex-row items-center justify-center gap-2 active:opacity-90 shadow-xs"
+              >
+                <AppIcon name="chat" size={18} color={colors.onSecondaryContainer} />
+                <Text className="text-xs font-bold text-onSecondaryContainer">
+                  Send WhatsApp Customer Slip
+                </Text>
+              </Pressable>
+
+              <View className="flex-row gap-2 mt-1">
+                <Pressable
+                  onPress={handleStartNextSale}
+                  className="flex-1 h-11 bg-surfaceContainer rounded-xl items-center justify-center active:bg-surfaceContainerHigh"
+                >
+                  <Text className="text-xs font-bold text-onSurface">New Sale</Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => {
+                    setCompletedSale(null);
+                    router.back();
+                  }}
+                  className="flex-1 h-11 bg-surfaceContainerLow border border-cardBorder rounded-xl items-center justify-center active:bg-surfaceContainer"
+                >
+                  <Text className="text-xs font-semibold text-onSurfaceVariant">Back to Till</Text>
+                </Pressable>
+              </View>
             </View>
           </View>
         </View>

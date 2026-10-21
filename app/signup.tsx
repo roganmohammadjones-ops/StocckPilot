@@ -40,7 +40,7 @@ export default function SignupScreen() {
     });
     router.push({
       pathname: '/otp-verify',
-      params: { phone: `+234 ${phone}`, businessName },
+      params: { phone: `+234 ${phone}`, businessName, source: 'signup' },
     });
   };
 

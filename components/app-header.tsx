@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { AppIcon } from './icon';
 import { BrandLogo } from './brand-logo';
 import { colors } from '@/lib/theme';
+import { useStoreProfile } from '@/lib/store-profile';
 
 interface AppHeaderProps {
   title?: string;
@@ -15,6 +16,7 @@ interface AppHeaderProps {
 export function AppHeader({ title, subtitle, showBack = false }: AppHeaderProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const store = useStoreProfile();
 
   return (
     <View
@@ -60,14 +62,14 @@ export function AppHeader({ title, subtitle, showBack = false }: AppHeaderProps)
                 className="flex-row items-center gap-0.5 active:opacity-75"
               >
                 <Text className="text-sm font-bold text-onSurface truncate max-w-[160px]">
-                  Bamidele & Sons
+                  {store.businessName || 'StockPilot Store'}
                 </Text>
                 <AppIcon name="arrow_drop_down" size={18} color={colors.onSurfaceVariant} />
               </Pressable>
               <View className="flex-row items-center gap-1">
                 <AppIcon name="location_on" size={12} color={colors.outline} />
-                <Text className="text-[11px] font-medium text-outline">
-                  Idumota, Lagos
+                <Text className="text-[11px] font-medium text-outline truncate max-w-[140px]">
+                  {store.marketLocation || 'Lagos, Nigeria'}
                 </Text>
               </View>
             </View>

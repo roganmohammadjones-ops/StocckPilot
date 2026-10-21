@@ -6,6 +6,8 @@ import {
   Pressable,
   RefreshControl,
   Linking,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { AppHeader } from '@/components/app-header';
@@ -15,6 +17,7 @@ import { colors } from '@/lib/theme';
 import { useDataRefresh, useAppDb } from '@/lib/db/provider';
 import { getFinancialReportData } from '@/lib/db/queries';
 import type { FinancialReportData } from '@/lib/db/types';
+import { shareFinancialReportPdf } from '@/lib/receipt';
 
 export default function ReportsScreen() {
   const router = useRouter();
@@ -25,6 +28,7 @@ export default function ReportsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedRange, setSelectedRange] = useState('Month (Oct 2024)');
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   const loadReport = useCallback(async () => {
     try {
@@ -76,6 +80,18 @@ export default function ReportsScreen() {
       `_Generated via StockPilot Nigeria (Offline-First POS)_`;
 
     Linking.openURL(`https://wa.me/?text=${message}`);
+  };
+
+  const handleExportPdf = async () => {
+    if (!report) return;
+    try {
+      setIsExportingPdf(true);
+      await shareFinancialReportPdf(report, selectedRange);
+    } catch (e: any) {
+      Alert.alert('PDF Export Error', e?.message || 'Could not export financial statement.');
+    } finally {
+      setIsExportingPdf(false);
+    }
   };
 
   const weeklyTrend = [
@@ -215,22 +231,35 @@ export default function ReportsScreen() {
               </View>
             </View>
 
-            {/* Quick WhatsApp Closeout Share Action */}
-            <Pressable
-              onPress={handleShareSummaryWhatsApp}
-              className="w-full h-12 bg-secondaryContainer rounded-xl px-4 flex-row items-center justify-between shadow-xs mb-4 active:opacity-90"
-            >
-              <View className="flex-row items-center gap-2">
-                <AppIcon name="chat" size={20} color={colors.secondary} />
-                <Text className="text-sm font-bold text-onSecondaryContainer">
-                  Broadcast Z-Report via WhatsApp
-                </Text>
+            {/* Quick Actions: PDF Statement & WhatsApp Closeout */}
+            <View className="gap-2 mb-4">
+              <View className="flex-row gap-2">
+                <Pressable
+                  disabled={isExportingPdf}
+                  onPress={handleExportPdf}
+                  className="flex-1 h-12 bg-primary rounded-xl px-4 flex-row items-center justify-center gap-2 shadow-xs active:bg-primaryContainer"
+                >
+                  {isExportingPdf ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <>
+                      <AppIcon name="picture_as_pdf" size={18} color="#ffffff" />
+                      <Text className="text-xs font-bold text-white">Export Audit PDF</Text>
+                    </>
+                  )}
+                </Pressable>
+
+                <Pressable
+                  onPress={handleShareSummaryWhatsApp}
+                  className="flex-1 h-12 bg-secondaryContainer rounded-xl px-4 flex-row items-center justify-center gap-2 shadow-xs active:opacity-90"
+                >
+                  <AppIcon name="chat" size={18} color={colors.onSecondaryContainer} />
+                  <Text className="text-xs font-bold text-onSecondaryContainer">
+                    WhatsApp Slip
+                  </Text>
+                </Pressable>
               </View>
-              <View className="flex-row items-center gap-1 bg-white/80 px-2.5 py-1 rounded-full">
-                <Text className="text-xs font-bold text-onSecondaryContainer">Share Summary</Text>
-                <AppIcon name="arrow_forward" size={14} color={colors.secondary} />
-              </View>
-            </Pressable>
+            </View>
 
             {/* Top-Selling Products by Revenue */}
             {report?.topSellingProducts && report.topSellingProducts.length > 0 && (

@@ -16,14 +16,17 @@ import { AppHeader } from '@/components/app-header';
 import { AppIcon } from '@/components/icon';
 import { colors } from '@/lib/theme';
 import { useDataRefresh, useAppDb } from '@/lib/db/provider';
+import { useStoreProfile } from '@/lib/store-profile';
 import {
   getSales,
   getDashboardMetrics,
   getCurrentShift,
   closeShift,
   openNewShift,
+  getSaleItems,
 } from '@/lib/db/queries';
 import type { SaleRecord, DashboardMetrics, ShiftRecord } from '@/lib/db/types';
+import { printReceipt, shareReceiptPdf } from '@/lib/receipt';
 
 function formatShiftTime(isoString?: string): string {
   if (!isoString) return 'Just now';
@@ -39,6 +42,7 @@ export default function SalesRegisterScreen() {
   const router = useRouter();
   const db = useAppDb();
   const { dataVersion } = useDataRefresh();
+  const store = useStoreProfile();
 
   const [selectedRange, setSelectedRange] = useState<'today' | 'yesterday' | 'week'>('today');
   const [sales, setSales] = useState<SaleRecord[]>([]);
@@ -46,6 +50,7 @@ export default function SalesRegisterScreen() {
   const [currentShift, setCurrentShift] = useState<ShiftRecord | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<SaleRecord | null>(null);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   // Shift Closeout & Drawer Reconciliation
   const [showShiftModal, setShowShiftModal] = useState(false);
@@ -158,6 +163,30 @@ export default function SalesRegisterScreen() {
       `_Thank you for your business!_`;
 
     Linking.openURL(`https://wa.me/?text=${text}`);
+  };
+
+  const handlePrintReceipt = async (tx: SaleRecord) => {
+    try {
+      setIsPrinting(true);
+      const items = await getSaleItems(db, tx.id);
+      await printReceipt(tx, items);
+    } catch (e: any) {
+      Alert.alert('Printing Error', e?.message || 'Could not send document to printer.');
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
+  const handleShareReceiptPdf = async (tx: SaleRecord) => {
+    try {
+      setIsPrinting(true);
+      const items = await getSaleItems(db, tx.id);
+      await shareReceiptPdf(tx, items);
+    } catch (e: any) {
+      Alert.alert('PDF Export Error', e?.message || 'Could not generate PDF receipt.');
+    } finally {
+      setIsPrinting(false);
+    }
   };
 
   return (
@@ -386,19 +415,37 @@ export default function SalesRegisterScreen() {
             </Pressable>
           </View>
 
-          <View className="gap-3">
-            {sales.map((tx) => (
-              <View
-                key={tx.id}
-                className="bg-white rounded-xl p-3.5 border border-cardBorder shadow-sm"
+          {sales.length === 0 ? (
+            <View className="bg-white rounded-xl p-8 items-center justify-center border border-cardBorder text-center">
+              <View className="w-14 h-14 rounded-full bg-secondaryContainer/50 items-center justify-center mb-3">
+                <AppIcon name="point_of_sale" size={28} color={colors.primary} />
+              </View>
+              <Text className="text-base font-bold text-onSurface mb-1">No sales recorded yet</Text>
+              <Text className="text-xs text-onSurfaceVariant text-center mb-4 max-w-xs">
+                Open the till to record your first transaction, accept payment, and issue a digital WhatsApp receipt.
+              </Text>
+              <Pressable
+                onPress={() => router.push('/modal/new-sale')}
+                className="px-4 py-2.5 rounded-xl bg-primary flex-row items-center gap-2"
               >
-                <View className="flex-row items-start justify-between mb-2">
-                  <View className="flex-row items-center gap-2.5 flex-1 mr-2">
-                    <View className="w-10 h-10 rounded-lg bg-surfaceContainer items-center justify-center">
-                      <AppIcon name="person" size={20} color={colors.onSurfaceVariant} />
-                    </View>
-                    <View className="flex-1 min-w-0">
-                      <View className="flex-row items-center gap-1.5">
+                <AppIcon name="add" size={16} color="#ffffff" />
+                <Text className="text-xs font-bold text-white">Open Till & Record Sale</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View className="gap-3">
+              {sales.map((tx) => (
+                <View
+                  key={tx.id}
+                  className="bg-white rounded-xl p-3.5 border border-cardBorder shadow-sm"
+                >
+                  <View className="flex-row items-start justify-between mb-2">
+                    <View className="flex-row items-center gap-2.5 flex-1 mr-2">
+                      <View className="w-10 h-10 rounded-lg bg-surfaceContainer items-center justify-center">
+                        <AppIcon name="person" size={20} color={colors.onSurfaceVariant} />
+                      </View>
+                      <View className="flex-1 min-w-0">
+                        <View className="flex-row items-center gap-1.5">
                         <Text className="text-sm font-bold text-onSurface truncate">
                           {tx.customerName || 'Walk-in Cash Customer'}
                         </Text>
@@ -450,6 +497,7 @@ export default function SalesRegisterScreen() {
               </View>
             ))}
           </View>
+        )}
         </View>
       </ScrollView>
 
@@ -466,8 +514,8 @@ export default function SalesRegisterScreen() {
 
             {/* Header */}
             <View className="items-center pb-3 border-b border-dashed border-cardBorder mb-4">
-              <Text className="text-lg font-bold text-onSurface">Bamidele & Sons Provisions</Text>
-              <Text className="text-xs text-onSurfaceVariant">Idumota Market Block B, Lagos</Text>
+              <Text className="text-lg font-bold text-onSurface">{store.businessName}</Text>
+              <Text className="text-xs text-onSurfaceVariant">{store.marketLocation}</Text>
               <Text className="text-xs font-mono text-primary font-bold mt-1">
                 Invoice #{selectedReceipt?.invoiceNo}
               </Text>
@@ -529,41 +577,61 @@ export default function SalesRegisterScreen() {
             </View>
 
             {/* Action Buttons */}
-            <View className="flex-row gap-2">
-              <Pressable
-                onPress={() => {
-                  if (selectedReceipt) handleShareReceiptWhatsApp(selectedReceipt);
-                }}
-                className="flex-1 h-12 bg-secondaryContainer rounded-xl flex-row items-center justify-center gap-1.5 active:opacity-90 shadow-xs"
-              >
-                <AppIcon name="chat" size={18} color={colors.onSecondaryContainer} />
-                <Text className="text-xs font-bold text-onSecondaryContainer">
-                  WhatsApp Slip
-                </Text>
-              </Pressable>
+            <View className="gap-2">
+              <View className="flex-row gap-2">
+                <Pressable
+                  disabled={isPrinting}
+                  onPress={() => {
+                    if (selectedReceipt) handlePrintReceipt(selectedReceipt);
+                  }}
+                  className="flex-1 h-12 bg-primary rounded-xl flex-row items-center justify-center gap-1.5 active:bg-primaryContainer shadow-sm"
+                >
+                  {isPrinting ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <>
+                      <AppIcon name="print" size={18} color="#ffffff" />
+                      <Text className="text-xs font-bold text-white">
+                        Print Thermal
+                      </Text>
+                    </>
+                  )}
+                </Pressable>
 
-              <Pressable
-                onPress={() => {
-                  Alert.alert(
-                    'Thermal Printer',
-                    `Sending #${selectedReceipt?.invoiceNo} to Moniepoint Bluetooth POS printer...`,
-                    [{ text: 'OK' }]
-                  );
-                }}
-                className="flex-1 h-12 bg-surfaceContainer rounded-xl flex-row items-center justify-center gap-1.5 active:bg-surfaceContainerHigh"
-              >
-                <AppIcon name="print" size={18} color={colors.onSurfaceVariant} />
-                <Text className="text-xs font-bold text-onSurfaceVariant">
-                  Print ESC/POS
-                </Text>
-              </Pressable>
+                <Pressable
+                  disabled={isPrinting}
+                  onPress={() => {
+                    if (selectedReceipt) handleShareReceiptPdf(selectedReceipt);
+                  }}
+                  className="flex-1 h-12 bg-surfaceContainer rounded-xl flex-row items-center justify-center gap-1.5 active:bg-surfaceContainerHigh"
+                >
+                  <AppIcon name="picture_as_pdf" size={18} color={colors.onSurface} />
+                  <Text className="text-xs font-bold text-onSurface">
+                    Share PDF
+                  </Text>
+                </Pressable>
+              </View>
 
-              <Pressable
-                onPress={() => setSelectedReceipt(null)}
-                className="w-12 h-12 rounded-xl bg-surfaceContainerLow items-center justify-center"
-              >
-                <AppIcon name="close" size={20} color={colors.onSurfaceVariant} />
-              </Pressable>
+              <View className="flex-row gap-2">
+                <Pressable
+                  onPress={() => {
+                    if (selectedReceipt) handleShareReceiptWhatsApp(selectedReceipt);
+                  }}
+                  className="flex-1 h-11 bg-secondaryContainer rounded-xl flex-row items-center justify-center gap-1.5 active:opacity-90 shadow-xs"
+                >
+                  <AppIcon name="chat" size={18} color={colors.onSecondaryContainer} />
+                  <Text className="text-xs font-bold text-onSecondaryContainer">
+                    WhatsApp Slip
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => setSelectedReceipt(null)}
+                  className="w-11 h-11 rounded-xl bg-surfaceContainerLow items-center justify-center active:bg-surfaceContainer"
+                >
+                  <AppIcon name="close" size={20} color={colors.onSurfaceVariant} />
+                </Pressable>
+              </View>
             </View>
           </View>
         </View>

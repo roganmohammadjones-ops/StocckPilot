@@ -71,6 +71,14 @@ const iconNameMap: Record<string, keyof typeof MaterialIcons.glyphMap> = {
   edit: 'edit',
   content_copy: 'content-copy',
   change_circle: 'change-circle',
+  sms: 'sms',
+  phone: 'phone',
+  smartphone: 'smartphone',
+  sim_card: 'sim-card',
+  send: 'send',
+  refresh: 'refresh',
+  check: 'check',
+  message: 'message',
 };
 
 interface IconProps {

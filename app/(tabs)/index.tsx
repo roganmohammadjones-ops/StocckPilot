@@ -14,6 +14,7 @@ import { AppIcon } from '@/components/icon';
 import { BrandLoader } from '@/components/brand-loader';
 import { colors } from '@/lib/theme';
 import { useDataRefresh, useAppDb } from '@/lib/db/provider';
+import { useStoreProfile } from '@/lib/store-profile';
 import {
   getDashboardMetrics,
   getProducts,
@@ -33,6 +34,7 @@ export default function HomeDashboardScreen() {
   const router = useRouter();
   const db = useAppDb();
   const { refreshTrigger } = useDataRefresh();
+  const store = useStoreProfile();
 
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [lowStockProducts, setLowStockProducts] = useState<Product[]>([]);
@@ -121,8 +123,8 @@ export default function HomeDashboardScreen() {
         <View className="mb-4">
           <View className="flex-row items-center justify-between mb-1">
             <View className="flex-row items-center gap-1.5 flex-1">
-              <Text className="text-xl font-bold text-onSurface">
-                Good day, Chief Bamidele
+              <Text className="text-xl font-bold text-onSurface truncate">
+                Good day, {store.ownerName || 'Merchant'}
               </Text>
               <Text className="text-lg">👋</Text>
             </View>
@@ -132,8 +134,8 @@ export default function HomeDashboardScreen() {
             </View>
           </View>
           <View className="flex-row items-center justify-between">
-            <Text className="text-xs text-onSurfaceVariant">
-              Bamidele & Sons Provisions • Balogun Market
+            <Text className="text-xs text-onSurfaceVariant truncate max-w-[240px]">
+              {store.businessName} • {store.marketLocation}
             </Text>
             <View className="flex-row items-center gap-1">
               <AppIcon name="verified" size={13} color={colors.primary} />
@@ -494,7 +496,9 @@ export default function HomeDashboardScreen() {
                     Linking.openURL(
                       `https://wa.me/${firstOverdue.phone.replace(/[^0-9]/g, '')}?text=Hello%20${encodeURIComponent(
                         firstOverdue.name
-                      )},%20friendly%20courtesy%20reminder%20regarding%20your%20settlement%20of%20₦${firstOverdue.balance.toLocaleString()}%20with%20Bamidele%20&%20Sons.`
+                      )},%20friendly%20courtesy%20reminder%20regarding%20your%20settlement%20of%20₦${firstOverdue.balance.toLocaleString()}%20with%20${encodeURIComponent(
+                        store.businessName
+                      )}.`
                     );
                   }}
                   className="flex-row items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-cardBorder shadow-xs active:bg-surfaceContainer"

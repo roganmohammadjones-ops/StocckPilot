@@ -283,7 +283,8 @@ export async function recordDebtPayment(
 
 export async function getSales(
   db: SQLiteDatabase,
-  limit: number = 50
+  limit: number = 50,
+  customerId?: string
 ): Promise<SaleRecord[]> {
   interface SaleRow {
     id: string;
@@ -301,7 +302,20 @@ export async function getSales(
     items_summary: string | null;
   }
 
-  const query = `
+  const query = customerId
+    ? `
+    SELECT
+      s.*,
+      COUNT(si.id) as item_count,
+      GROUP_CONCAT(si.product_name || ' x' || si.quantity, ', ') as items_summary
+    FROM sales s
+    LEFT JOIN sale_items si ON s.id = si.sale_id
+    WHERE s.customer_id = ?
+    GROUP BY s.id
+    ORDER BY s.created_at DESC
+    LIMIT ?
+  `
+    : `
     SELECT
       s.*,
       COUNT(si.id) as item_count,
@@ -313,7 +327,9 @@ export async function getSales(
     LIMIT ?
   `;
 
-  const rows = await db.getAllAsync<SaleRow>(query, [limit]);
+  const rows = customerId
+    ? await db.getAllAsync<SaleRow>(query, [customerId, limit])
+    : await db.getAllAsync<SaleRow>(query, [limit]);
 
   return rows.map((r) => ({
     id: r.id,
@@ -329,6 +345,49 @@ export async function getSales(
     createdAt: r.created_at,
     itemCount: r.item_count,
     itemsSummary: r.items_summary ?? undefined,
+  }));
+}
+
+export interface SaleItemRecord {
+  id: string;
+  saleId: string;
+  productId: string;
+  productName: string;
+  sku: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+}
+
+export async function getSaleItems(
+  db: SQLiteDatabase,
+  saleId: string
+): Promise<SaleItemRecord[]> {
+  interface ItemRow {
+    id: string;
+    sale_id: string;
+    product_id: string;
+    product_name: string;
+    sku: string;
+    quantity: number;
+    unit_price: number;
+    total_price: number;
+  }
+  const query = `
+    SELECT * FROM sale_items
+    WHERE sale_id = ?
+    ORDER BY id ASC
+  `;
+  const rows = await db.getAllAsync<ItemRow>(query, [saleId]);
+  return rows.map((r) => ({
+    id: r.id,
+    saleId: r.sale_id,
+    productId: r.product_id,
+    productName: r.product_name,
+    sku: r.sku,
+    quantity: r.quantity,
+    unitPrice: r.unit_price,
+    totalPrice: r.total_price,
   }));
 }
 
@@ -773,5 +832,36 @@ export async function openNewShift(
   };
 }
 
+export async function clearAllDatabaseRecords(db: SQLiteDatabase): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    await db.execAsync(`
+      DELETE FROM sale_items;
+      DELETE FROM sales;
+      DELETE FROM products;
+      DELETE FROM customers;
+      DELETE FROM debt_payments;
+      DELETE FROM expenses;
+      DELETE FROM shifts;
+    `);
+  });
+}
 
-
+export async function seedStandardSampleCatalog(db: SQLiteDatabase): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO products (id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, recent_note)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ['prod_1', 'Dangote Refined Sugar 50kg', 'DNG-SUG-50', 'Grains & Staples', 'grains', 25, 'bags', 10, 68000, 74500, 'Standard FMCG Bag']
+    );
+    await db.runAsync(
+      `INSERT OR REPLACE INTO products (id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, recent_note)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ['prod_2', 'Golden Penny Semovita 10kg', 'GP-SEMO-10K', 'Grains & Staples', 'grains', 15, 'packs', 8, 32000, 36000, 'Flour Mills Nig']
+    );
+    await db.runAsync(
+      `INSERT OR REPLACE INTO products (id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, recent_note)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ['prod_3', 'Peak Evaporated Milk 160g (Carton 48)', 'PEAK-CAN-48', 'Canned & Dairy', 'canned', 40, 'cartons', 15, 24500, 28500, 'FrieslandCampina']
+    );
+  });
+}

@@ -275,12 +275,30 @@ export default function InventoryScreen() {
         </View>
 
         {/* Product Cards Stream */}
-        <View className="gap-3">
-          {filteredProducts.map((product) => {
-            const margin = product.sellingPrice - product.costPrice;
-            const marginPct = ((margin / product.costPrice) * 100).toFixed(1);
+        {filteredProducts.length === 0 ? (
+          <View className="bg-white rounded-xl p-8 items-center justify-center border border-cardBorder text-center">
+            <View className="w-14 h-14 rounded-full bg-secondaryContainer/50 items-center justify-center mb-3">
+              <AppIcon name="inventory_2" size={28} color={colors.primary} />
+            </View>
+            <Text className="text-base font-bold text-onSurface mb-1">No products found</Text>
+            <Text className="text-xs text-onSurfaceVariant text-center mb-4 max-w-xs">
+              Add your first inventory item or stock up to start tracking SKUs and calculating margins.
+            </Text>
+            <Pressable
+              onPress={() => router.push('/modal/add-product')}
+              className="px-4 py-2.5 rounded-xl bg-primary flex-row items-center gap-2"
+            >
+              <AppIcon name="add" size={16} color="#ffffff" />
+              <Text className="text-xs font-bold text-white">Add First Product</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View className="gap-3">
+            {filteredProducts.map((product) => {
+              const margin = product.sellingPrice - product.costPrice;
+              const marginPct = ((margin / product.costPrice) * 100).toFixed(1);
 
-            return (
+              return (
               <View
                 key={product.id}
                 className="bg-white rounded-xl p-3.5 border border-cardBorder shadow-sm relative overflow-hidden"
@@ -409,6 +427,7 @@ export default function InventoryScreen() {
             );
           })}
         </View>
+      )}
       </ScrollView>
     </View>
   );

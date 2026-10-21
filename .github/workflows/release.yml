@@ -118,7 +118,9 @@ jobs:
         run: npm ci
 
       - name: Export Expo Web Bundle
-        run: npx expo export -p web
+        run: |
+          npx expo export -p web
+          cp dist/index.html dist/404.html
         env:
           EXPO_NO_TELEMETRY: '1'
 

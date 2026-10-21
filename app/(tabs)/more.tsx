@@ -7,6 +7,7 @@ import { BrandLogo } from '@/components/brand-logo';
 import { colors } from '@/lib/theme';
 import { useDataRefresh, useAppDb } from '@/lib/db/provider';
 import { getStoredUser, logout } from '@/lib/auth';
+import { useStoreProfile } from '@/lib/store-profile';
 
 interface MenuItem {
   title: string;
@@ -26,6 +27,7 @@ export default function MoreHubScreen() {
   const router = useRouter();
   const db = useAppDb();
   const { dataVersion } = useDataRefresh();
+  const store = useStoreProfile();
   const [productCount, setProductCount] = useState(0);
   const [customerCount, setCustomerCount] = useState(0);
   const user = getStoredUser();

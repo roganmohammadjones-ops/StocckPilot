@@ -386,6 +386,22 @@ function getSeedData(): WebStoreData {
   };
 }
 
+function getSafeLocalStorage(): Storage | null {
+  try {
+    if (typeof window === 'undefined') return null;
+    if (!('localStorage' in window)) return null;
+    const storage = window.localStorage;
+    if (!storage) return null;
+    const testKey = '__stockpilot_test__';
+    storage.setItem(testKey, '1');
+    storage.removeItem(testKey);
+    return storage;
+  } catch {
+    // Graceful fallback for Safari private browsing, sandboxed iframes, or disabled storage
+    return null;
+  }
+}
+
 class WebDatabaseImpl implements AppDatabase {
   private data: WebStoreData;
 
@@ -394,31 +410,53 @@ class WebDatabaseImpl implements AppDatabase {
   }
 
   private loadStore(): WebStoreData {
-    if (typeof window !== 'undefined' && window.localStorage) {
+    const seed = getSeedData();
+    const storage = getSafeLocalStorage();
+    if (storage) {
       try {
-        const stored = window.localStorage.getItem(STORAGE_KEY);
+        const stored = storage.getItem(STORAGE_KEY);
         if (stored) {
-          return JSON.parse(stored);
+          const parsed = JSON.parse(stored);
+          return {
+            products: Array.isArray(parsed.products) ? parsed.products : seed.products,
+            customers: Array.isArray(parsed.customers) ? parsed.customers : seed.customers,
+            sales: Array.isArray(parsed.sales) ? parsed.sales : seed.sales,
+            saleItems: Array.isArray(parsed.saleItems) ? parsed.saleItems : seed.saleItems,
+            expenses: Array.isArray(parsed.expenses) ? parsed.expenses : seed.expenses,
+            debtPayments: Array.isArray(parsed.debtPayments) ? parsed.debtPayments : seed.debtPayments,
+            shifts: Array.isArray(parsed.shifts) ? parsed.shifts : seed.shifts,
+          };
         }
       } catch (e) {
         console.warn('Failed to load localStorage web DB', e);
       }
     }
-    return getSeedData();
+    return seed;
   }
 
   private saveStore(): void {
-    if (typeof window !== 'undefined' && window.localStorage) {
+    const storage = getSafeLocalStorage();
+    if (storage) {
       try {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(this.data));
+        storage.setItem(STORAGE_KEY, JSON.stringify(this.data));
       } catch (e) {
         console.warn('Failed to save localStorage web DB', e);
       }
     }
   }
 
-  async execAsync(_sql: string): Promise<void> {
-    // Schema creation is handled by in-memory structure
+  async execAsync(sql: string): Promise<void> {
+    let changed = false;
+    if (sql.includes('DELETE FROM sale_items')) { this.data.saleItems = []; changed = true; }
+    if (sql.includes('DELETE FROM sales')) { this.data.sales = []; changed = true; }
+    if (sql.includes('DELETE FROM products')) { this.data.products = []; changed = true; }
+    if (sql.includes('DELETE FROM customers')) { this.data.customers = []; changed = true; }
+    if (sql.includes('DELETE FROM debt_payments')) { this.data.debtPayments = []; changed = true; }
+    if (sql.includes('DELETE FROM expenses')) { this.data.expenses = []; changed = true; }
+    if (sql.includes('DELETE FROM shifts')) { this.data.shifts = []; changed = true; }
+    if (changed) {
+      this.saveStore();
+    }
   }
 
   async withTransactionAsync<T>(task: (txn: AppDatabase) => Promise<T>): Promise<T> {
@@ -429,8 +467,9 @@ class WebDatabaseImpl implements AppDatabase {
     const s = sql.trim();
 
     // 1. INSERT INTO products
-    if (s.startsWith('INSERT INTO products')) {
-      const [id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, wholesale_price, recent_note] = params;
+    if (s.startsWith('INSERT INTO products') || s.startsWith('INSERT OR REPLACE INTO products')) {
+      const [id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, recent_note] = params;
+      this.data.products = this.data.products.filter(p => p.id !== id && p.sku !== sku);
       this.data.products.unshift({
         id,
         name,
@@ -442,13 +481,14 @@ class WebDatabaseImpl implements AppDatabase {
         min_alert: Number(min_alert),
         cost_price: Number(cost_price),
         selling_price: Number(selling_price),
-        wholesale_price: wholesale_price != null ? Number(wholesale_price) : null,
+        wholesale_price: null,
         recent_note: recent_note || null,
         created_at: new Date().toISOString(),
       });
       this.saveStore();
       return { changes: 1, lastInsertRowId: Date.now() };
     }
+
 
     // 2. UPDATE products SET stock_left
     if (s.startsWith('UPDATE products SET stock_left')) {
@@ -743,8 +783,17 @@ class WebDatabaseImpl implements AppDatabase {
 
     // 7. Get Sales List (with joined item summaries)
     if (s.includes('FROM sales s') && s.includes('LEFT JOIN sale_items si')) {
-      const limit = params[0] || 50;
-      const result = this.data.sales.slice(0, limit).map((sale) => {
+      let salesList = this.data.sales;
+      let limit = 50;
+      if (s.includes('WHERE s.customer_id = ?')) {
+        const custId = params[0];
+        limit = params[1] || 50;
+        salesList = salesList.filter((sale) => sale.customer_id === custId);
+      } else {
+        limit = params[0] || 50;
+      }
+
+      const result = salesList.slice(0, limit).map((sale) => {
         const items = this.data.saleItems.filter((it) => it.sale_id === sale.id);
         const item_count = items.length;
         const items_summary = items.map((it) => `${it.product_name} x${it.quantity}`).join(', ');
@@ -757,6 +806,13 @@ class WebDatabaseImpl implements AppDatabase {
       });
 
       return result as unknown as T[];
+    }
+
+    // 7b. Get Line Items for a specific sale
+    if (s.includes('FROM sale_items') && s.includes('sale_id = ?')) {
+      const saleId = params[0];
+      const items = this.data.saleItems.filter((it) => it.sale_id === saleId);
+      return items as unknown as T[];
     }
 
     // 8. Cost Summary for Financial Reports
