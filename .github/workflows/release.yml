@@ -59,34 +59,43 @@ jobs:
           mkdir -p build-artifacts
           APK_PATH=$(find android/app/build/outputs/apk -name "*.apk" | head -n 1)
           echo "Found APK at: $APK_PATH"
-          cp "$APK_PATH" build-artifacts/StockPilot-Nigeria-v1.0.0.apk
+          TAG_VAL="${{ github.ref_name }}"
+          if [ -z "$TAG_VAL" ] || [ "$TAG_VAL" = "main" ]; then
+            TAG_VAL="v1.0.1"
+          fi
+          cp "$APK_PATH" "build-artifacts/StockPilot-Nigeria-${TAG_VAL}.apk"
+          cp "$APK_PATH" "build-artifacts/StockPilot-Nigeria.apk"
           ls -la build-artifacts/
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: StockPilot-Nigeria-APK
-          path: build-artifacts/StockPilot-Nigeria-v1.0.0.apk
+          path: build-artifacts/*.apk
 
       - name: Publish GitHub Release with APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.0' }}
-          name: "StockPilot Nigeria Production v1.0.0"
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.1' }}
+          name: "StockPilot Nigeria Production ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.1' }}"
           body: |
             ## StockPilot Nigeria Production Release
 
-            Offline-first FMCG inventory, POS sales till, and B2B wholesale marketplace for Nigeria's open-market commercial corridors.
+            Offline-first FMCG inventory, POS sales till, and B2B wholesale marketplace for Nigeria's open-market commercial corridors (Idumota, Alaba, Kano Dawanau, Onitsha).
 
-            ### 📦 Release Features:
+            ### 🌐 Live Production Web App:
+            **[https://stockpilotng.expo.app](https://stockpilotng.expo.app)**
+
+            ### 🚀 Updates in this release:
+            - **Official Brand Logo & Mark**: High-resolution 3D emblem with rocket arrow and sparkles integrated across all app headers, launch screen, settings, and cards.
+            - **Branded Pulsing Loading Icon**: Replaced generic activity indicators with animated brand emblem loader.
+            - **Web Favicon & Mobile App Icons**: Adaptive foreground/background, Material You monochrome icon, and web favicon.
             - **Point of Sale (POS)**: Fast till checkout for walk-in & registered customers with Cash, Bank Transfer, Moniepoint POS, and Credit ledger options.
             - **Offline-First SQLite**: Local transactions, instant stock balance recalculations, and sales records with 100% offline uptime.
-            - **Wholesale Depot Network**: Direct warehouse replenishment, supplier order generation, and WhatsApp PO integration.
-            - **Profit & Loss Analytics**: Real-time margin tracking and turnover metrics.
 
             ### 📱 Download & Install:
-            Download **`StockPilot-Nigeria-v1.0.0.apk`** below to install directly on your Android phone or terminal.
-          files: build-artifacts/StockPilot-Nigeria-v1.0.0.apk
+            Download **`StockPilot-Nigeria-v1.0.1.apk`** below to install directly on your Android device.
+          files: build-artifacts/*.apk
           draft: false
           prerelease: false
         env:
@@ -118,3 +127,15 @@ jobs:
         with:
           name: StockPilot-Web-Production
           path: dist/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
