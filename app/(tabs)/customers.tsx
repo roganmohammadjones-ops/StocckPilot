@@ -6,7 +6,6 @@ import {
   TextInput,
   Pressable,
   Linking,
-  ActivityIndicator,
   RefreshControl,
   Modal,
   Alert,

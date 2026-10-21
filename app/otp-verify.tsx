@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { AppIcon } from '@/components/icon';
+import { BrandLogo } from '@/components/brand-logo';
 import { colors } from '@/lib/theme';
 import { getStoredUser, saveStoredUser } from '@/lib/auth';
 
@@ -62,9 +63,7 @@ export default function OtpVerifyScreen() {
           <AppIcon name="arrow_back" size={22} color={colors.onSurface} />
         </Pressable>
         <Text className="text-base font-bold text-onSurface">Phone OTP Verification</Text>
-        <View className="w-8 h-8 rounded-full bg-primary items-center justify-center">
-          <AppIcon name="person" size={16} color="#ffffff" />
-        </View>
+        <BrandLogo variant="emblem" size={28} />
       </View>
 
       <ScrollView
@@ -90,8 +89,8 @@ export default function OtpVerifyScreen() {
         {/* Verification Hero Card */}
         <View className="bg-white rounded-2xl p-5 border border-cardBorder shadow-sm mb-5">
           <View className="flex-row items-start gap-3 mb-2">
-            <View className="w-12 h-12 rounded-xl bg-secondaryContainer items-center justify-center">
-              <AppIcon name="chat" size={24} color={colors.secondary} />
+            <View className="w-12 h-12 rounded-xl bg-secondaryContainer/50 items-center justify-center border border-cardBorder">
+              <BrandLogo variant="emblem" size={32} />
             </View>
             <View className="flex-1 min-w-0">
               <Text className="text-[11px] font-bold text-secondary uppercase tracking-wider">

@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { AppIcon } from '@/components/icon';
+import { BrandLogo } from '@/components/brand-logo';
 import { colors } from '@/lib/theme';
 import { signupMerchant } from '@/lib/auth';
 
@@ -53,10 +54,8 @@ export default function SignupScreen() {
         >
           <AppIcon name="arrow_back" size={22} color={colors.onSurface} />
         </Pressable>
-        <View className="flex-row items-center gap-1.5">
-          <View className="w-6 h-6 rounded-md bg-primary items-center justify-center">
-            <AppIcon name="inventory" size={14} color="#ffffff" />
-          </View>
+        <View className="flex-row items-center gap-2">
+          <BrandLogo variant="emblem" size={26} />
           <Text className="text-base font-bold text-onSurface">StockPilot NG</Text>
         </View>
         <View className="w-10" />
@@ -66,6 +65,8 @@ export default function SignupScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
       >
+        <BrandLogo variant="full" width={135} className="mb-4" />
+
         {/* Step Indicator */}
         <View className="mb-6">
           <View className="flex-row items-center justify-between mb-2">

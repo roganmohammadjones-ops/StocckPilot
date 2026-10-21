@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { AppIcon } from '@/components/icon';
+import { BrandLogo } from '@/components/brand-logo';
 import { colors } from '@/lib/theme';
 
 export default function OrderReviewScreen() {
@@ -29,9 +30,7 @@ export default function OrderReviewScreen() {
           <AppIcon name="arrow_back" size={22} color={colors.onSurface} />
         </Pressable>
         <Text className="text-base font-bold text-onSurface">Cart & Checkout Review</Text>
-        <View className="w-8 h-8 rounded-full bg-primary items-center justify-center">
-          <AppIcon name="person" size={16} color="#ffffff" />
-        </View>
+        <BrandLogo variant="emblem" size={28} />
       </View>
 
       <ScrollView

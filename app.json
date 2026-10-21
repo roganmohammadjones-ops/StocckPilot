@@ -8,7 +8,7 @@
     "scheme": "stockpilotnigeria",
     "userInterfaceStyle": "light",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/icon.png",
       "bundleIdentifier": "com.stockpilotng.app"
     },
     "android": {
@@ -33,7 +33,7 @@
         {
           "backgroundColor": "#f0fdf4",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 100
         }
       ],
       "expo-font",

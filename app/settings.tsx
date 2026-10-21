@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { AppHeader } from '@/components/app-header';
 import { AppIcon } from '@/components/icon';
+import { BrandLogo } from '@/components/brand-logo';
 import { colors } from '@/lib/theme';
 import { syncDatabaseWithCloud } from '@/lib/db/sync';
 import { logout } from '@/lib/auth';
@@ -72,8 +73,8 @@ export default function SettingsScreen() {
         {/* Business Profile Card */}
         <View className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm mb-4">
           <View className="flex-row items-center gap-3 mb-3">
-            <View className="w-14 h-14 rounded-2xl bg-primary items-center justify-center">
-              <AppIcon name="warehouse" size={28} color="#ffffff" />
+            <View className="w-14 h-14 rounded-2xl bg-secondaryContainer/50 items-center justify-center border border-cardBorder shadow-sm overflow-hidden">
+              <BrandLogo variant="emblem" size={38} />
             </View>
             <View className="flex-1 min-w-0">
               <View className="flex-row items-center gap-1.5">
@@ -254,6 +255,17 @@ export default function SettingsScreen() {
               </Text>
             </Pressable>
           </View>
+        </View>
+
+        {/* Footer Brand Identity */}
+        <View className="items-center py-4 mb-4">
+          <BrandLogo variant="full" width={120} className="mb-2" />
+          <Text className="text-xs font-bold text-onSurfaceVariant">
+            StockPilot Nigeria Business Manager
+          </Text>
+          <Text className="text-[11px] text-outline mt-0.5">
+            Version 1.0.0 • Verified for Nigerian Wholesale Trade
+          </Text>
         </View>
       </ScrollView>
     </View>

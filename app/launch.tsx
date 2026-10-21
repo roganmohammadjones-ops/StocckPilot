@@ -3,10 +3,10 @@ import {
   View,
   Text,
   Pressable,
-  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { AppIcon } from '@/components/icon';
+import { BrandLogo } from '@/components/brand-logo';
 import { getStoredUser } from '@/lib/auth';
 
 interface Step {
@@ -85,28 +85,7 @@ export default function LaunchSplashScreen() {
           {/* Pilot Cube Geometric Container */}
           <View className="w-24 h-24 rounded-2xl bg-gradient-to-b from-[#00873a] to-[#004d1f] p-0.5 shadow-2xl items-center justify-center border border-[#7ffc97]/30">
             <View className="w-full h-full rounded-[14px] bg-[#03261a] items-center justify-center relative overflow-hidden">
-              {Platform.OS === 'web' ? (
-                // SVG rendering directly on web
-                <svg
-                  width="56"
-                  height="56"
-                  viewBox="0 0 64 64"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <polygon points="32,8 52,19 32,30 12,19" fill="#7ffc97" opacity="0.95" />
-                  <polygon points="12,19 32,30 32,54 12,43" fill="#00873a" />
-                  <polygon points="32,30 52,19 52,43 32,54" fill="#16a34a" />
-                  <line x1="32" y1="30" x2="32" y2="54" stroke="#8bd79b" strokeWidth="1.5" strokeLinecap="round" opacity="0.6" />
-                  <path d="M48 24 L59 18 L55 27 L48 29 Z" fill="#ffffff" opacity="0.95" />
-                  <path d="M16 24 L5 18 L9 27 L16 29 Z" fill="#ffffff" opacity="0.95" />
-                  <circle cx="32" cy="30" r="2.5" fill="#ffffff" />
-                </svg>
-              ) : (
-                <View className="items-center justify-center">
-                  <AppIcon name="warehouse" size={38} color="#7ffc97" />
-                </View>
-              )}
+              <BrandLogo variant="emblem" size={60} />
             </View>
           </View>
 

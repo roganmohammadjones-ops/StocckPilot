@@ -3,12 +3,16 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { Screen } from '@/components/screen';
+import { BrandLogo } from '@/components/brand-logo';
 
 export default function SetupCheckScreen() {
   const [count, setCount] = useState(0);
 
   return (
     <Screen>
+      <View className="items-center py-2 mb-2">
+        <BrandLogo variant="full" width={140} />
+      </View>
       <Text className="text-base leading-7 text-slate-600">
         This screen exercises Expo Router and NativeWind utility classes. The card
         changes colour each time you increment the counter.

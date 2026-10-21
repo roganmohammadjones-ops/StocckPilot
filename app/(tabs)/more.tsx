@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { AppHeader } from '@/components/app-header';
 import { AppIcon } from '@/components/icon';
+import { BrandLogo } from '@/components/brand-logo';
 import { colors } from '@/lib/theme';
 import { useDataRefresh } from '@/lib/db/provider';
 import { getStoredUser, logout } from '@/lib/auth';
@@ -148,8 +149,8 @@ export default function MoreHubScreen() {
         {/* Merchant Profile Snapshot */}
         <View className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm mb-5">
           <View className="flex-row items-center gap-3">
-            <View className="w-14 h-14 rounded-2xl bg-primary items-center justify-center shadow-sm">
-              <AppIcon name="warehouse" size={28} color="#ffffff" />
+            <View className="w-14 h-14 rounded-2xl bg-secondaryContainer/50 items-center justify-center border border-cardBorder shadow-sm overflow-hidden">
+              <BrandLogo variant="emblem" size={38} />
             </View>
             <View className="flex-1 min-w-0">
               <View className="flex-row items-center gap-1.5">
@@ -237,7 +238,8 @@ export default function MoreHubScreen() {
         </View>
 
         {/* System Version & Node ID */}
-        <View className="items-center py-2">
+        <View className="items-center py-4">
+          <BrandLogo variant="full" width={110} className="mb-2" />
           <Text className="text-xs font-bold text-onSurfaceVariant">
             StockPilot Nigeria Business Manager
           </Text>
