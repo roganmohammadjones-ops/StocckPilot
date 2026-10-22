@@ -44,3 +44,23 @@ v1.0.3 release. Before publishing a draft, inspect the artifacts and signing,
 smoke-test the APK on a device and the web app in a browser, and approve the release.
 Do not rerun an old failed workflow to test these changes: retries use the old
 commit/workflow. Run the corrected branch/commit instead.
+
+## Public app configuration
+
+Configure these repository Actions variables (or secrets) before running builds:
+
+- EXPO_PUBLIC_SUPABASE_URL
+- EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+
+Use the existing values from the linked EAS project's production environment.
+These settings are embedded in the public app. Use only a publishable key or
+legacy anon key, never a service-role or server secret key. EAS environment
+variables are not automatically available to GitHub Actions. The release workflow
+checks configuration before building to prevent a build that compiles but crashes
+at startup with "supabaseUrl is required". Repository variables also allow fork PR
+validation without providing secrets.
+
+For EAS Hosting, rebuild using the production environment and a clean Metro cache
+before deploying a preview. Verify the preview renders and its assets load before
+promoting that exact deployment ID to production. Keep the EAS export at the root
+base path; do not deploy the Pages-specific bundle to EAS Hosting.

@@ -26,6 +26,8 @@ permissions:
 env:
   CI: '1'
   EXPO_NO_TELEMETRY: '1'
+  EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL || secrets.EXPO_PUBLIC_SUPABASE_URL }}
+  EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
 
 jobs:
   validate:
@@ -38,6 +40,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Verify public app configuration
+        run: node scripts/check-build-env.cjs
       - run: npm run typecheck
       - run: npm run lint
 
