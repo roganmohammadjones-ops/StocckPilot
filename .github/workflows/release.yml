@@ -6,21 +6,46 @@ on:
       - 'v*'
     branches:
       - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
+    inputs:
+      deploy_web:
+        description: Deploy the verified web build to GitHub Pages (main only)
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
-  contents: write
-  pages: write
-  id-token: write
+  contents: read
+
+env:
+  CI: '1'
+  EXPO_NO_TELEMETRY: '1'
 
 jobs:
+  validate:
+    name: Typecheck & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+
   build-apk:
     name: Build Android APK
+    needs: validate
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -39,70 +64,55 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # The action defaults to 'tools platform-tools'; 'tools' was retired.
+          # Gradle installs the SDK/NDK versions required by the generated project.
+          packages: platform-tools
+
+      - name: Verify Android SDK initialization
+        run: |
+          sdkmanager --version
+          adb --version
 
       - name: Install dependencies
         run: npm ci
 
       - name: Generate Native Android Project (CNG)
-        run: npx expo prebuild --platform android --clean
-        env:
-          EXPO_NO_TELEMETRY: '1'
+        run: npx expo prebuild --platform android --clean --no-install
 
       - name: Build Android Release APK
+        working-directory: android
         run: |
-          cd android
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
 
       - name: Prepare APK for Release
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
+          APK_PATH=android/app/build/outputs/apk/release/app-release.apk
+          test -s "$APK_PATH"
+          unzip -t "$APK_PATH"
           mkdir -p build-artifacts
-          APK_PATH=$(find android/app/build/outputs/apk -name "*.apk" | head -n 1)
-          echo "Found APK at: $APK_PATH"
-          TAG_VAL="${{ github.ref_name }}"
-          if [ -z "$TAG_VAL" ] || [ "$TAG_VAL" = "main" ]; then
-            TAG_VAL="v1.0.3"
+          TAG_VAL="v$(node -p "require('./app.json').expo.version")"
+          if [ "$REF_TYPE" = tag ]; then
+            TAG_VAL="$REF_NAME"
           fi
           cp "$APK_PATH" "build-artifacts/StockPilot-Nigeria-${TAG_VAL}.apk"
-          cp "$APK_PATH" "build-artifacts/StockPilot-Nigeria.apk"
-          ls -la build-artifacts/
+          cp "$APK_PATH" build-artifacts/StockPilot-Nigeria.apk
+          sha256sum build-artifacts/*.apk > build-artifacts/SHA256SUMS
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: StockPilot-Nigeria-APK
-          path: build-artifacts/*.apk
+          path: build-artifacts/
+          if-no-files-found: error
 
-      - name: Publish GitHub Release with APK
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.3' }}
-          name: "StockPilot Nigeria Production ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.3' }}"
-          body: |
-            ## StockPilot Nigeria Production Release
-
-            Offline-first FMCG inventory, POS sales till, and B2B wholesale marketplace for Nigeria's open-market commercial corridors (Idumota, Alaba, Kano Dawanau, Onitsha).
-
-            ### 🌐 Live Production Web App:
-            **[https://stockpilotng.expo.app](https://stockpilotng.expo.app)**
-
-            ### 🚀 Updates in this release:
-            - **Official Brand Logo & Mark**: High-resolution 3D emblem with rocket arrow and sparkles integrated across all app headers, launch screen, settings, and cards.
-            - **Branded Pulsing Loading Icon**: Replaced generic activity indicators with animated brand emblem loader.
-            - **Web Favicon & Mobile App Icons**: Adaptive foreground/background, Material You monochrome icon, and web favicon.
-            - **Point of Sale (POS)**: Fast till checkout for walk-in & registered customers with Cash, Bank Transfer, Moniepoint POS, and Credit ledger options.
-            - **Offline-First SQLite**: Local transactions, instant stock balance recalculations, and sales records with 100% offline uptime.
-
-            ### 📱 Download & Install:
-            Download **`StockPilot-Nigeria-v1.0.1.apk`** below to install directly on your Android device.
-          files: build-artifacts/*.apk
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  deploy-web:
+  build-web:
     name: Build & Export Expo Web
+    needs: validate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -121,23 +131,76 @@ jobs:
         run: |
           npx expo export -p web
           cp dist/index.html dist/404.html
-        env:
-          EXPO_NO_TELEMETRY: '1'
 
       - name: Upload Web Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: StockPilot-Web-Production
           path: dist/
+          if-no-files-found: error
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
+      - name: Export GitHub Pages bundle with repository base path
+        env:
+          STOCKPILOT_WEB_BASE_PATH: /${{ github.event.repository.name }}
+        run: |
+          npx expo export -p web --output-dir dist/pages
+          cp dist/pages/index.html dist/pages/404.html
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist/
+          path: dist/pages/
+
+  deploy-web:
+    name: Deploy verified web build to GitHub Pages
+    needs: [build-apk, build-web]
+    # PRs, tags and default manual runs only validate/build. Main pushes deploy.
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' ||
+       (github.event_name == 'workflow_dispatch' && inputs.deploy_web))
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+        # One-time prerequisite: Settings > Pages > Source = GitHub Actions.
+        # GITHUB_TOKEN cannot enable Pages; do not request admin credentials here.
 
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  draft-release:
+    name: Prepare draft release with APK
+    needs: [build-apk, build-web]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: StockPilot-Nigeria-APK
+          path: build-artifacts
+      - name: Prepare draft GitHub Release with APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: StockPilot Nigeria ${{ github.ref_name }}
+          body: |
+            StockPilot Nigeria candidate build. Review the workflow checks, APK
+            signing identity, and device smoke tests before publishing this draft.
+            Download StockPilot-Nigeria.apk and verify it against SHA256SUMS.
+          files: build-artifacts/*
+          fail_on_unmatched_files: true
+          draft: true
+          prerelease: false
