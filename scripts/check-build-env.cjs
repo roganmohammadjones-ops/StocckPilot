@@ -1,4 +1,5 @@
 // Expo embeds EXPO_PUBLIC_* values at build time. Never print their values.
+const { Buffer } = require('node:buffer');
 const required = [
   'EXPO_PUBLIC_SUPABASE_URL',
   'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
