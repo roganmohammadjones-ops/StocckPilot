@@ -98,6 +98,28 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
       notes TEXT,
       status TEXT DEFAULT 'open'
     );
+
+    CREATE TABLE IF NOT EXISTS waybills (
+      id TEXT PRIMARY KEY,
+      sale_id TEXT NOT NULL,
+      invoice_no TEXT NOT NULL,
+      waybill_no TEXT NOT NULL UNIQUE,
+      transporter_name TEXT NOT NULL,
+      park_loading_bay TEXT NOT NULL,
+      driver_phone TEXT NOT NULL,
+      vehicle_plate TEXT,
+      destination_city TEXT NOT NULL,
+      receiver_name TEXT NOT NULL,
+      receiver_phone TEXT NOT NULL,
+      packages_count INTEGER NOT NULL DEFAULT 1,
+      package_type TEXT DEFAULT 'cartons',
+      carriage_fee REAL DEFAULT 0,
+      porter_fee REAL DEFAULT 0,
+      status TEXT DEFAULT 'in_transit',
+      notes TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE
+    );
   `);
 
   // Migrations for existing databases
@@ -111,6 +133,34 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
     await db.execAsync(`ALTER TABLE sale_items ADD COLUMN price_tier TEXT DEFAULT 'retail';`);
   } catch {
     // column may already exist
+  }
+
+  try {
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS waybills (
+        id TEXT PRIMARY KEY,
+        sale_id TEXT NOT NULL,
+        invoice_no TEXT NOT NULL,
+        waybill_no TEXT NOT NULL UNIQUE,
+        transporter_name TEXT NOT NULL,
+        park_loading_bay TEXT NOT NULL,
+        driver_phone TEXT NOT NULL,
+        vehicle_plate TEXT,
+        destination_city TEXT NOT NULL,
+        receiver_name TEXT NOT NULL,
+        receiver_phone TEXT NOT NULL,
+        packages_count INTEGER NOT NULL DEFAULT 1,
+        package_type TEXT DEFAULT 'cartons',
+        carriage_fee REAL DEFAULT 0,
+        porter_fee REAL DEFAULT 0,
+        status TEXT DEFAULT 'in_transit',
+        notes TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE
+      );
+    `);
+  } catch {
+    // table may already exist
   }
 
   // Remove any legacy customer records/debtors and demo sales so users start with a clean ledger

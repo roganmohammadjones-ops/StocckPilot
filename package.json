@@ -46,7 +46,8 @@
     "doctor": "npx expo-doctor",
     "check:dependencies": "expo install --check",
     "export:web": "expo export -p web && cp dist/index.html dist/404.html",
-    "export:all": "expo export --platform all"
+    "export:all": "expo export --platform all",
+    "build:apk": "bash scripts/build-apk.sh"
   },
   "private": true,
   "engines": {

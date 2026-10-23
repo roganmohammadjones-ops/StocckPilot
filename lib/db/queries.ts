@@ -8,6 +8,8 @@ import type {
   DashboardMetrics,
   FinancialReportData,
   ShiftRecord,
+  WaybillRecord,
+  WaybillInput,
 } from './types';
 
 export type SQLiteDatabase = AppDatabase;
@@ -964,4 +966,143 @@ export async function seedStandardSampleCatalog(db: SQLiteDatabase): Promise<voi
       ['prod_3', 'Peak Evaporated Milk 160g (Carton 48)', 'PEAK-CAN-48', 'Canned & Dairy', 'canned', 40, 'cartons', 15, 24500, 28500, 'FrieslandCampina']
     );
   });
+}
+
+// ==========================================
+// WAYBILL & INTERSTATE DISPATCH QUERIES
+// ==========================================
+
+interface WaybillRow {
+  id: string;
+  sale_id: string;
+  invoice_no: string;
+  waybill_no: string;
+  transporter_name: string;
+  park_loading_bay: string;
+  driver_phone: string;
+  vehicle_plate: string | null;
+  destination_city: string;
+  receiver_name: string;
+  receiver_phone: string;
+  packages_count: number;
+  package_type: string;
+  carriage_fee: number;
+  porter_fee: number;
+  status: 'loading' | 'in_transit' | 'delivered';
+  notes: string | null;
+  created_at: string;
+}
+
+export async function createWaybill(
+  db: SQLiteDatabase,
+  input: WaybillInput
+): Promise<string> {
+  const id = `wb_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+  const waybillNo =
+    input.waybillNo ||
+    `WB-${new Date().getFullYear().toString().slice(-2)}${Math.floor(10000 + Math.random() * 90000)}`;
+
+  await db.runAsync(
+    `INSERT INTO waybills (
+      id, sale_id, invoice_no, waybill_no, transporter_name, park_loading_bay,
+      driver_phone, vehicle_plate, destination_city, receiver_name, receiver_phone,
+      packages_count, package_type, carriage_fee, porter_fee, status, notes
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      input.saleId,
+      input.invoiceNo,
+      waybillNo,
+      input.transporterName,
+      input.parkLoadingBay,
+      input.driverPhone,
+      input.vehiclePlate ?? null,
+      input.destinationCity,
+      input.receiverName,
+      input.receiverPhone,
+      input.packagesCount || 1,
+      input.packageType || 'cartons',
+      input.carriageFee ?? 0,
+      input.porterFee ?? 0,
+      input.status || 'in_transit',
+      input.notes ?? null,
+    ]
+  );
+
+  return id;
+}
+
+export async function getWaybillBySaleId(
+  db: SQLiteDatabase,
+  saleId: string
+): Promise<WaybillRecord | null> {
+  const row = await db.getFirstAsync<WaybillRow>(
+    `SELECT * FROM waybills WHERE sale_id = ? ORDER BY created_at DESC LIMIT 1`,
+    [saleId]
+  );
+
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    saleId: row.sale_id,
+    invoiceNo: row.invoice_no,
+    waybillNo: row.waybill_no,
+    transporterName: row.transporter_name,
+    parkLoadingBay: row.park_loading_bay,
+    driverPhone: row.driver_phone,
+    vehiclePlate: row.vehicle_plate ?? undefined,
+    destinationCity: row.destination_city,
+    receiverName: row.receiver_name,
+    receiverPhone: row.receiver_phone,
+    packagesCount: row.packages_count,
+    packageType: row.package_type,
+    carriageFee: row.carriage_fee,
+    porterFee: row.porter_fee,
+    status: row.status,
+    notes: row.notes ?? undefined,
+    createdAt: row.created_at,
+  };
+}
+
+export async function getWaybills(
+  db: SQLiteDatabase,
+  limit: number = 50
+): Promise<WaybillRecord[]> {
+  const rows = await db.getAllAsync<WaybillRow>(
+    `SELECT * FROM waybills ORDER BY created_at DESC LIMIT ?`,
+    [limit]
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    saleId: row.sale_id,
+    invoiceNo: row.invoice_no,
+    waybillNo: row.waybill_no,
+    transporterName: row.transporter_name,
+    parkLoadingBay: row.park_loading_bay,
+    driverPhone: row.driver_phone,
+    vehiclePlate: row.vehicle_plate ?? undefined,
+    destinationCity: row.destination_city,
+    receiverName: row.receiver_name,
+    receiverPhone: row.receiver_phone,
+    packagesCount: row.packages_count,
+    packageType: row.package_type,
+    carriageFee: row.carriage_fee,
+    porterFee: row.porter_fee,
+    status: row.status,
+    notes: row.notes ?? undefined,
+    createdAt: row.created_at,
+  }));
+}
+
+export async function updateWaybillStatus(
+  db: SQLiteDatabase,
+  waybillId: string,
+  status: 'loading' | 'in_transit' | 'delivered'
+): Promise<void> {
+  await db.runAsync(
+    `UPDATE waybills SET status = ? WHERE id = ?`,
+    [status, waybillId]
+  );
 }

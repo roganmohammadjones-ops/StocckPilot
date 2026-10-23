@@ -96,6 +96,27 @@ interface ShiftRecordRow {
   status: 'open' | 'closed';
 }
 
+interface WaybillRecordRow {
+  id: string;
+  sale_id: string;
+  invoice_no: string;
+  waybill_no: string;
+  transporter_name: string;
+  park_loading_bay: string;
+  driver_phone: string;
+  vehicle_plate: string | null;
+  destination_city: string;
+  receiver_name: string;
+  receiver_phone: string;
+  packages_count: number;
+  package_type: string;
+  carriage_fee: number;
+  porter_fee: number;
+  status: 'loading' | 'in_transit' | 'delivered';
+  notes: string | null;
+  created_at: string;
+}
+
 interface WebStoreData {
   products: ProductRecord[];
   customers: CustomerRecord[];
@@ -104,6 +125,7 @@ interface WebStoreData {
   expenses: ExpenseRecordRow[];
   debtPayments: DebtPaymentRecord[];
   shifts: ShiftRecordRow[];
+  waybills: WaybillRecordRow[];
 }
 
 const STORAGE_KEY = 'stockpilot_web_db_v2';
@@ -236,6 +258,7 @@ function getSeedData(): WebStoreData {
         status: 'open',
       },
     ],
+    waybills: [],
   };
 }
 
@@ -300,6 +323,7 @@ class WebDatabaseImpl implements AppDatabase {
             expenses: Array.isArray(parsed.expenses) ? parsed.expenses : seed.expenses,
             debtPayments: [],
             shifts: cleanedShifts,
+            waybills: Array.isArray(parsed.waybills) ? parsed.waybills : [],
           };
 
           if (
@@ -357,6 +381,7 @@ class WebDatabaseImpl implements AppDatabase {
     if (sql.includes('DELETE FROM debt_payments')) { this.data.debtPayments = []; changed = true; }
     if (sql.includes('DELETE FROM expenses')) { this.data.expenses = []; changed = true; }
     if (sql.includes('DELETE FROM shifts')) { this.data.shifts = []; changed = true; }
+    if (sql.includes('DELETE FROM waybills')) { this.data.waybills = []; changed = true; }
     if (changed) {
       this.saveStore();
     }
@@ -573,6 +598,63 @@ class WebDatabaseImpl implements AppDatabase {
         sh.discrepancy = Number(discrepancy);
         sh.notes = notes;
         sh.status = 'closed';
+        this.saveStore();
+      }
+      return { changes: 1, lastInsertRowId: 0 };
+    }
+
+    // 10. WAYBILLS
+    if (s.startsWith('INSERT INTO waybills') || s.startsWith('INSERT OR REPLACE INTO waybills')) {
+      const [
+        id,
+        sale_id,
+        invoice_no,
+        waybill_no,
+        transporter_name,
+        park_loading_bay,
+        driver_phone,
+        vehicle_plate,
+        destination_city,
+        receiver_name,
+        receiver_phone,
+        packages_count,
+        package_type,
+        carriage_fee,
+        porter_fee,
+        status,
+        notes,
+      ] = params;
+
+      this.data.waybills = this.data.waybills.filter((w) => w.id !== id && w.waybill_no !== waybill_no);
+      this.data.waybills.unshift({
+        id,
+        sale_id,
+        invoice_no,
+        waybill_no,
+        transporter_name,
+        park_loading_bay,
+        driver_phone,
+        vehicle_plate: vehicle_plate || null,
+        destination_city,
+        receiver_name,
+        receiver_phone,
+        packages_count: Number(packages_count || 1),
+        package_type: package_type || 'cartons',
+        carriage_fee: Number(carriage_fee || 0),
+        porter_fee: Number(porter_fee || 0),
+        status: status || 'in_transit',
+        notes: notes || null,
+        created_at: new Date().toISOString(),
+      });
+      this.saveStore();
+      return { changes: 1, lastInsertRowId: Date.now() };
+    }
+
+    if (s.startsWith('UPDATE waybills SET status = ? WHERE id = ?')) {
+      const [newStatus, waybillId] = params;
+      const wb = this.data.waybills.find((w) => w.id === waybillId);
+      if (wb) {
+        wb.status = newStatus;
         this.saveStore();
       }
       return { changes: 1, lastInsertRowId: 0 };
@@ -828,6 +910,17 @@ class WebDatabaseImpl implements AppDatabase {
         .filter((x) => x.payment_method === 'cash')
         .reduce((sum, x) => sum + x.amount, 0);
       return [{ total: cashExp } as unknown as T];
+    }
+
+    // 15. Waybills
+    if (s.includes('FROM waybills') && s.includes('sale_id = ?')) {
+      const saleId = params[0];
+      return this.data.waybills.filter((w) => w.sale_id === saleId) as unknown as T[];
+    }
+
+    if (s.includes('FROM waybills') && s.includes('SELECT *')) {
+      const limit = params[0] || 50;
+      return this.data.waybills.slice(0, limit) as unknown as T[];
     }
 
     return [];

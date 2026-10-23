@@ -132,5 +132,45 @@ export interface ShiftRecord {
   status: 'open' | 'closed';
 }
 
+export interface WaybillRecord {
+  id: string;
+  saleId: string;
+  invoiceNo: string;
+  waybillNo: string;
+  transporterName: string;
+  parkLoadingBay: string;
+  driverPhone: string;
+  vehiclePlate?: string;
+  destinationCity: string;
+  receiverName: string;
+  receiverPhone: string;
+  packagesCount: number;
+  packageType: string;
+  carriageFee?: number;
+  porterFee?: number;
+  status: 'loading' | 'in_transit' | 'delivered';
+  notes?: string;
+  createdAt: string;
+}
+
+export interface WaybillInput {
+  saleId: string;
+  invoiceNo: string;
+  waybillNo?: string;
+  transporterName: string;
+  parkLoadingBay: string;
+  driverPhone: string;
+  vehiclePlate?: string;
+  destinationCity: string;
+  receiverName: string;
+  receiverPhone: string;
+  packagesCount: number;
+  packageType?: string;
+  carriageFee?: number;
+  porterFee?: number;
+  status?: 'loading' | 'in_transit' | 'delivered';
+  notes?: string;
+}
+
 
 

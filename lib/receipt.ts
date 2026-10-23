@@ -1,7 +1,7 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
-import type { SaleRecord, Customer, FinancialReportData } from './db/types';
+import type { SaleRecord, Customer, FinancialReportData, WaybillRecord } from './db/types';
 import { getStoredUser } from './auth';
 import { getStoreProfile } from './store-profile';
 
@@ -774,4 +774,458 @@ export async function shareFinancialReportPdf(
       UTI: 'com.adobe.pdf',
     });
   }
+}
+
+// --------------------------------------------------------------------------
+// 5. Interstate Waybill & Dispatch Logistics Slip Generator
+// --------------------------------------------------------------------------
+
+export function generateWaybillHtml(
+  waybill: WaybillRecord,
+  sale: SaleRecord,
+  items?: ReceiptItem[],
+  store?: StoreDetails
+): string {
+  const user = getStoredUser();
+  const profile = getStoreProfile();
+  const businessName = store?.businessName || profile.businessName || user?.businessName || 'StockPilot Store';
+  const tradeHub = store?.tradeHub || profile.marketLocation || user?.tradeHub || 'Lagos, Nigeria';
+  const phone = store?.phone || profile.phone || user?.phone || '';
+  const dateStr = waybill.createdAt
+    ? new Date(waybill.createdAt).toLocaleString('en-NG', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      })
+    : new Date().toLocaleString();
+
+  let parsedItems: ReceiptItem[] = items || [];
+  if (parsedItems.length === 0 && sale.itemsSummary) {
+    parsedItems = sale.itemsSummary.split(', ').map((str) => {
+      const match = str.match(/^(.*?)\s*x(\d+(?:\.\d+)?)$/);
+      if (match) {
+        const qty = parseFloat(match[2]);
+        const approxUnit = sale.itemCount > 0 ? Math.round(sale.netPayable / sale.itemCount) : sale.netPayable;
+        return {
+          productName: match[1],
+          quantity: qty,
+          unitPrice: approxUnit,
+          totalPrice: qty * approxUnit,
+        };
+      }
+      return {
+        productName: str,
+        quantity: 1,
+        unitPrice: sale.netPayable,
+        totalPrice: sale.netPayable,
+      };
+    });
+  }
+
+  const itemsHtml = parsedItems
+    .map(
+      (item) => `
+      <tr>
+        <td style="padding: 6px 0; border-bottom: 1px dashed #d1d5db; font-size: 12px; font-weight: 600; color: #111827;">
+          ${item.productName}
+          ${item.priceTier && item.priceTier !== 'retail' ? `<span style="display:inline-block; margin-left:4px; font-size:8px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; border-radius:3px; padding:0 3px; font-weight:700; text-transform:uppercase;">${item.priceTier}</span>` : ''}
+          ${item.sku ? `<br/><span style="font-size: 10px; color: #6b7280; font-family: monospace;">SKU: ${item.sku}</span>` : ''}
+        </td>
+        <td style="padding: 6px 4px; border-bottom: 1px dashed #d1d5db; font-size: 12px; text-align: center; font-weight: 700; color: #111827;">
+          ${item.quantity}
+        </td>
+        <td style="padding: 6px 0; border-bottom: 1px dashed #d1d5db; font-size: 12px; text-align: right; font-weight: 600; color: #374151;">
+          ${formatNaira(item.totalPrice ?? item.quantity * item.unitPrice)}
+        </td>
+      </tr>
+    `
+    )
+    .join('');
+
+  const statusColor =
+    waybill.status === 'delivered'
+      ? '#15803d'
+      : waybill.status === 'in_transit'
+      ? '#0369a1'
+      : '#b45309';
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Waybill ${waybill.waybillNo}</title>
+  <style>
+    @page { margin: 4mm; size: 80mm auto; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 12px;
+      color: #111827;
+      background-color: #ffffff;
+      max-width: 380px;
+      margin: 0 auto;
+      box-sizing: border-box;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 10px;
+      border-bottom: 2px solid #00873a;
+      padding-bottom: 8px;
+    }
+    .pill {
+      display: inline-block;
+      background-color: #00873a;
+      color: #ffffff;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+    .route-banner {
+      background-color: #022c22;
+      color: #ffffff;
+      padding: 8px 10px;
+      border-radius: 6px;
+      text-align: center;
+      margin-bottom: 10px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+    .meta-box {
+      background-color: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-bottom: 10px;
+      font-size: 11px;
+    }
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 2px 0;
+    }
+    .section-title {
+      font-size: 10px;
+      font-weight: 800;
+      color: #047857;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      border-bottom: 1px solid #d1fae5;
+      padding-bottom: 2px;
+    }
+    .grid-card {
+      background-color: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      padding: 8px;
+      margin-bottom: 8px;
+      font-size: 11px;
+    }
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 10px;
+    }
+    .items-table th {
+      font-size: 9px;
+      font-weight: 700;
+      color: #4b5563;
+      text-transform: uppercase;
+      border-bottom: 1.5px solid #00873a;
+      padding: 4px 0;
+    }
+    .sign-box {
+      border: 1px dashed #9ca3af;
+      border-radius: 6px;
+      padding: 8px;
+      margin-top: 8px;
+      font-size: 10px;
+    }
+    .sign-line {
+      border-bottom: 1px solid #374151;
+      height: 24px;
+      margin-top: 4px;
+      margin-bottom: 2px;
+    }
+    .barcode {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 28px;
+      margin: 8px auto 4px auto;
+      letter-spacing: 4px;
+      font-family: monospace;
+      font-size: 16px;
+      font-weight: 900;
+      background: repeating-linear-gradient(
+        90deg,
+        #111827,
+        #111827 2px,
+        transparent 2px,
+        transparent 4px,
+        #111827 4px,
+        #111827 7px,
+        transparent 7px,
+        transparent 9px
+      );
+      width: 80%;
+      border-radius: 4px;
+    }
+    .footer {
+      text-align: center;
+      border-top: 1px dashed #d1d5db;
+      padding-top: 8px;
+      margin-top: 10px;
+      font-size: 9px;
+      color: #6b7280;
+      line-height: 1.3;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="pill">Interstate Dispatch Manifest</div>
+    <div style="font-size: 15px; font-weight: 800; color: #021811; margin-bottom: 2px;">${businessName}</div>
+    <div style="font-size: 11px; color: #4b5563;">${tradeHub} • Tel: ${phone}</div>
+  </div>
+
+  <div class="route-banner">
+    ROUTE: ${tradeHub.split('•')[0].trim()} ➔ ${waybill.destinationCity.toUpperCase()}
+  </div>
+
+  <div class="meta-box">
+    <div class="meta-row">
+      <span style="color: #6b7280;">Waybill No:</span>
+      <span style="font-family: monospace; font-weight: 800; color: #00873a; font-size: 13px;">#${waybill.waybillNo}</span>
+    </div>
+    <div class="meta-row">
+      <span style="color: #6b7280;">Ref Invoice:</span>
+      <span style="font-family: monospace; font-weight: 700;">#${sale.invoiceNo}</span>
+    </div>
+    <div class="meta-row">
+      <span style="color: #6b7280;">Dispatch Date:</span>
+      <span style="font-weight: 600;">${dateStr}</span>
+    </div>
+    <div class="meta-row">
+      <span style="color: #6b7280;">Manifest Status:</span>
+      <span style="font-weight: 800; color: ${statusColor}; text-transform: uppercase;">${waybill.status.replace('_', ' ')}</span>
+    </div>
+  </div>
+
+  <!-- Consignee / Receiver Box -->
+  <div class="grid-card">
+    <div class="section-title">Consignee (Receiver Details)</div>
+    <div class="meta-row">
+      <span style="color: #6b7280;">Receiver:</span>
+      <span style="font-weight: 700;">${waybill.receiverName}</span>
+    </div>
+    <div class="meta-row">
+      <span style="color: #6b7280;">Destination City:</span>
+      <span style="font-weight: 700; color: #0f766e;">${waybill.destinationCity}</span>
+    </div>
+    <div class="meta-row">
+      <span style="color: #6b7280;">Phone Contact:</span>
+      <span style="font-weight: 700;">${waybill.receiverPhone}</span>
+    </div>
+  </div>
+
+  <!-- Transporter / Park Haulage Box -->
+  <div class="grid-card">
+    <div class="section-title">Transporter & Motor Park Bay</div>
+    <div class="meta-row">
+      <span style="color: #6b7280;">Transporter:</span>
+      <span style="font-weight: 700;">${waybill.transporterName}</span>
+    </div>
+    <div class="meta-row">
+      <span style="color: #6b7280;">Loading Bay:</span>
+      <span>${waybill.parkLoadingBay}</span>
+    </div>
+    <div class="meta-row">
+      <span style="color: #6b7280;">Driver Phone:</span>
+      <span style="font-weight: 700;">${waybill.driverPhone}</span>
+    </div>
+    ${waybill.vehiclePlate ? `
+    <div class="meta-row">
+      <span style="color: #6b7280;">Vehicle Plate:</span>
+      <span style="font-family: monospace; font-weight: 700;">${waybill.vehiclePlate}</span>
+    </div>
+    ` : ''}
+  </div>
+
+  <!-- Consignment Summary -->
+  <div class="grid-card" style="background-color: #f0fdf4; border-color: #bbf7d0;">
+    <div class="section-title" style="color: #166534; border-color: #bbf7d0;">Package & Freight Audit</div>
+    <div class="meta-row">
+      <span style="color: #166534;">Total Parcels:</span>
+      <span style="font-weight: 800; font-size: 13px; color: #15803d;">${waybill.packagesCount} ${waybill.packageType.toUpperCase()}</span>
+    </div>
+    ${waybill.carriageFee ? `
+    <div class="meta-row">
+      <span style="color: #166534;">Carriage / Freight:</span>
+      <span style="font-weight: 700;">${formatNaira(waybill.carriageFee)}</span>
+    </div>
+    ` : ''}
+    ${waybill.porterFee ? `
+    <div class="meta-row">
+      <span style="color: #166534;">Porterage / Kaya Fee:</span>
+      <span style="font-weight: 700;">${formatNaira(waybill.porterFee)}</span>
+    </div>
+    ` : ''}
+    <div class="meta-row" style="border-top: 1px dashed #86efac; padding-top: 4px; margin-top: 4px;">
+      <span style="color: #166534;">Declared Invoice Value:</span>
+      <span style="font-weight: 800; color: #166534;">${formatNaira(sale.netPayable)}</span>
+    </div>
+  </div>
+
+  <!-- Goods Manifest Table -->
+  <table class="items-table">
+    <thead>
+      <tr>
+        <th style="text-align: left;">Item Description</th>
+        <th style="text-align: center;">Qty</th>
+        <th style="text-align: right;">Declared Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${itemsHtml}
+    </tbody>
+  </table>
+
+  ${waybill.notes ? `
+  <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 6px 8px; margin-bottom: 8px; font-size: 10px; color: #92400e;">
+    <strong>Park / Dispatch Notes:</strong> ${waybill.notes}
+  </div>
+  ` : ''}
+
+  <!-- Driver & Receiver Signatures -->
+  <div class="sign-box">
+    <div style="font-weight: 700; margin-bottom: 4px; text-transform: uppercase; font-size: 9px; color: #374151;">
+      Dispatch & Custody Handover Endorsements
+    </div>
+    <div style="display: flex; gap: 8px; margin-top: 6px;">
+      <div style="flex: 1;">
+        <div style="font-size: 9px; color: #6b7280;">Driver Signature & Date:</div>
+        <div class="sign-line"></div>
+        <div style="font-size: 8px; color: #9ca3af;">Packages received intact</div>
+      </div>
+      <div style="flex: 1;">
+        <div style="font-size: 9px; color: #6b7280;">Consignee Delivery Sign:</div>
+        <div class="sign-line"></div>
+        <div style="font-size: 8px; color: #9ca3af;">Delivered & verified</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="barcode"></div>
+  <div style="text-align: center; font-family: monospace; font-size: 10px; font-weight: bold; margin-bottom: 4px;">
+    *${waybill.waybillNo}*
+  </div>
+
+  <div class="footer">
+    <p style="margin: 2px 0; font-weight: 700; color: #111827;">Commercial Dispatch Manifest • Valid Across State Transit Lines</p>
+    <p style="margin: 2px 0;">Goods inspected before dispatch. Driver must verify parcel seals with consignee before handover.</p>
+    <p style="margin: 4px 0 0 0; color: #9ca3af;">Powered by StockPilot Nigeria • Inter-Market Logistics Engine</p>
+  </div>
+</body>
+</html>
+  `;
+}
+
+export async function printWaybill(
+  waybill: WaybillRecord,
+  sale: SaleRecord,
+  items?: ReceiptItem[],
+  store?: StoreDetails
+): Promise<void> {
+  const html = generateWaybillHtml(waybill, sale, items, store);
+  await Print.printAsync({ html });
+}
+
+export async function shareWaybillPdf(
+  waybill: WaybillRecord,
+  sale: SaleRecord,
+  items?: ReceiptItem[],
+  store?: StoreDetails
+): Promise<string> {
+  const html = generateWaybillHtml(waybill, sale, items, store);
+  if (Platform.OS === 'web') {
+    await Print.printAsync({ html });
+    return '';
+  }
+  const { uri } = await Print.printToFileAsync({ html });
+  const isAvailable = await Sharing.isAvailableAsync();
+  if (isAvailable) {
+    await Sharing.shareAsync(uri, {
+      mimeType: 'application/pdf',
+      dialogTitle: `Waybill Manifest #${waybill.waybillNo} - ${waybill.destinationCity}`,
+      UTI: 'com.adobe.pdf',
+    });
+  }
+  return uri;
+}
+
+export function generateWaybillWhatsAppMessage(
+  waybill: WaybillRecord,
+  sale: SaleRecord,
+  store?: StoreDetails,
+  recipientType: 'driver' | 'receiver' = 'receiver'
+): string {
+  const user = getStoredUser();
+  const profile = getStoreProfile();
+  const businessName = store?.businessName || profile.businessName || user?.businessName || 'StockPilot Store';
+  const tradeHub = store?.tradeHub || profile.marketLocation || user?.tradeHub || 'Lagos, Nigeria';
+
+  if (recipientType === 'driver') {
+    return (
+      `🚛 *COMMERCIAL DISPATCH & WAYBILL MANIFEST*%0A` +
+      `*Sender:* ${businessName.toUpperCase()}%0A` +
+      `*Origin Hub:* ${tradeHub}%0A` +
+      `--------------------------------%0A` +
+      `*Waybill No:* #${waybill.waybillNo}%0A` +
+      `*Ref Invoice:* #${sale.invoiceNo}%0A` +
+      `*Destination City:* ${waybill.destinationCity.toUpperCase()}%0A` +
+      `*Transporter:* ${waybill.transporterName}%0A` +
+      `*Loading Bay:* ${waybill.parkLoadingBay}%0A` +
+      (waybill.vehiclePlate ? `*Vehicle Plate:* ${waybill.vehiclePlate}%0A` : '') +
+      `--------------------------------%0A` +
+      `*CONSIGNEE (RECEIVER) DETAILS:*%0A` +
+      `👤 *Name:* ${waybill.receiverName}%0A` +
+      `📞 *Phone:* ${waybill.receiverPhone}%0A` +
+      `📦 *Parcels:* ${waybill.packagesCount} ${waybill.packageType.toUpperCase()}%0A` +
+      (waybill.carriageFee ? `💰 *Freight Fee:* ₦${waybill.carriageFee.toLocaleString()}%0A` : '') +
+      `--------------------------------%0A` +
+      `*Items Dispatched:* ${sale.itemsSummary || `${sale.itemCount} SKUs`}%0A` +
+      `--------------------------------%0A` +
+      `_Please call consignee upon arrival at ${waybill.destinationCity} motor park._`
+    );
+  }
+
+  return (
+    `📦 *INTERSTATE WAYBILL DISPATCH NOTICE*%0A` +
+    `Dear *${waybill.receiverName}*,%0A` +
+    `Your goods from *${businessName.toUpperCase()}* (${tradeHub}) have been dispatched via interstate transport!%0A` +
+    `--------------------------------%0A` +
+    `*Waybill Number:* #${waybill.waybillNo}%0A` +
+    `*Invoice Number:* #${sale.invoiceNo}%0A` +
+    `*Destination Park/City:* ${waybill.destinationCity.toUpperCase()}%0A` +
+    `*Transporter:* ${waybill.transporterName}%0A` +
+    `*Loading Bay:* ${waybill.parkLoadingBay}%0A` +
+    `*Driver Phone:* ${waybill.driverPhone}%0A` +
+    (waybill.vehiclePlate ? `*Vehicle Plate:* ${waybill.vehiclePlate}%0A` : '') +
+    `*Packages Sent:* ${waybill.packagesCount} ${waybill.packageType.toUpperCase()}%0A` +
+    `--------------------------------%0A` +
+    `*Manifest Items:*%0A` +
+    `${sale.itemsSummary || `${sale.itemCount} SKUs`}%0A` +
+    `--------------------------------%0A` +
+    `_Present Waybill #${waybill.waybillNo} at the motor park upon arrival to collect your parcel._%0A` +
+    `_Thank you for your patronage!_`
+  );
 }
