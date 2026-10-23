@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://roganmohammadjones-ops.github.io/StocckPilot"><strong>🌐 Launch Live Web App</strong></a> •
-  <a href="https://github.com/roganmohammadjones-ops/StocckPilot/releases/latest"><strong>📱 Download Android APK (v1.0.6)</strong></a> •
+  <a href="https://github.com/roganmohammadjones-ops/StocckPilot/releases/latest"><strong>📱 Download Android APK (v1.0.7)</strong></a> •
   <a href="https://expo.dev/accounts/stockpilotng/projects/stockpilotng"><strong>⚡ EAS Project Dashboard</strong></a>
 </p>
 
@@ -45,9 +45,9 @@ Built with **Expo SDK 57**, **React Native 0.86**, **Expo Router**, **TypeScript
 
 The production Android release is packaged and verified through Continuous Native Generation (CNG):
 
-- **Latest Version**: `v1.0.6` (Build code `6`)
+- **Latest Version**: `v1.0.7` (Build code `7`)
 - **Package Identifier**: `com.stockpilotng.app`
-- **Direct APK Download**: [Download StockPilot-Nigeria-v1.0.6.apk](https://github.com/roganmohammadjones-ops/StocckPilot/releases/latest)
+- **Direct APK Download**: [Download StockPilot-Nigeria-v1.0.7.apk](https://github.com/roganmohammadjones-ops/StocckPilot/releases/latest)
 - **All Releases & Changelogs**: [GitHub Releases Page](https://github.com/roganmohammadjones-ops/StocckPilot/releases)
 
 > **Installation Note**: On Android, allow "Install from Unknown Sources" or your browser's package installer permission when installing the standalone APK.
