@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,6 @@ import {
 import { useRouter } from 'expo-router';
 import { AppIcon } from '@/components/icon';
 import { BrandLogo } from '@/components/brand-logo';
-import { getStoredUser } from '@/lib/auth';
 
 interface Step {
   pct: number;
@@ -28,6 +27,13 @@ export default function LaunchSplashScreen() {
   const router = useRouter();
   const [currentStepIdx, setCurrentStepIdx] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
+  const hasNavigatedRef = useRef(false);
+
+  const navigateToOnboarding = useCallback(() => {
+    if (hasNavigatedRef.current) return;
+    hasNavigatedRef.current = true;
+    router.replace('/onboarding');
+  }, [router]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -45,13 +51,19 @@ export default function LaunchSplashScreen() {
     return () => clearInterval(timer);
   }, []);
 
+  // When splash initialization completes, immediately follow with onboarding before anything else
+  useEffect(() => {
+    if (!isComplete) return;
+
+    const navTimer = setTimeout(() => {
+      navigateToOnboarding();
+    }, 350);
+
+    return () => clearTimeout(navTimer);
+  }, [isComplete, navigateToOnboarding]);
+
   const handleProceed = () => {
-    const user = getStoredUser();
-    if (user) {
-      router.replace('/(tabs)');
-    } else {
-      router.replace('/onboarding');
-    }
+    navigateToOnboarding();
   };
 
   const currentStep = steps[currentStepIdx];
@@ -166,7 +178,7 @@ export default function LaunchSplashScreen() {
           className="w-full h-12 rounded-xl bg-[#16a34a] items-center justify-center flex-row gap-2 active:bg-[#15803d] shadow-lg"
         >
           <Text className="text-white font-bold text-sm">
-            {isComplete ? 'Enter StockPilot NG' : 'Skip & Launch Workspace'}
+            {isComplete ? 'Continue to Onboarding' : 'Skip to Onboarding'}
           </Text>
           <AppIcon name="arrow_forward" size={18} color="#ffffff" />
         </Pressable>

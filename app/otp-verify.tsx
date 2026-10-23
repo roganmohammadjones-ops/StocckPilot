@@ -17,9 +17,12 @@ import { getStoredUser, saveStoredUser, UserProfile } from '@/lib/auth';
 import {
   parseNigerianPhone,
   dispatchOtp,
-  verifyOtpCode,
+  verifyOtpCodeAsync,
   getActiveOtpSession,
   generateOtpCode,
+  getTermiiApiKey,
+  saveTermiiApiKey,
+  hasTermiiApiKey,
   OtpChannel,
 } from '@/lib/otp';
 
@@ -42,6 +45,12 @@ export default function OtpVerifyScreen() {
     params.initialChannel === 'sms' ? 'sms' : 'whatsapp'
   );
 
+  // Termii Gateway Configuration state
+  const [hasGatewayKey, setHasGatewayKey] = useState<boolean>(hasTermiiApiKey());
+  const [showGatewayConfig, setShowGatewayConfig] = useState<boolean>(false);
+  const [inputTermiiKey, setInputTermiiKey] = useState<string>(getTermiiApiKey() || '');
+  const [isSavingKey, setIsSavingKey] = useState<boolean>(false);
+
   // OTP Digits (6 digits)
   const [digits, setDigits] = useState<string[]>(['', '', '', '', '', '']);
   const inputsRef = useRef<(TextInput | null)[]>([]);
@@ -54,7 +63,7 @@ export default function OtpVerifyScreen() {
 
   // Feedback Messages
   const [feedbackStatus, setFeedbackStatus] = useState<{
-    type: 'success' | 'error' | 'info';
+    type: 'success' | 'error' | 'info' | 'warning';
     message: string;
   } | null>(null);
 
@@ -64,23 +73,39 @@ export default function OtpVerifyScreen() {
 
   // Initialize or fetch active OTP session on mount (dispatches in background)
   useEffect(() => {
+    const keyConfigured = hasTermiiApiKey();
+    setHasGatewayKey(keyConfigured);
+
     const session = getActiveOtpSession();
     if (!session || Date.now() > session.expiresAt) {
       const newCode = generateOtpCode(6);
-      dispatchOtp(activeChannel, phoneNumber, newCode, params.businessName).then(() => {
-        setFeedbackStatus({
-          type: 'info',
-          message: activeChannel === 'whatsapp'
-            ? `A 6-digit verification code has been sent to your WhatsApp (${parsedPhone.displayPhone}). Please check your WhatsApp messages.`
-            : `A 6-digit verification code has been sent via SMS to ${parsedPhone.carrier.name} (${parsedPhone.displayPhone}). Please check your text messages.`,
-        });
+      dispatchOtp(activeChannel, phoneNumber, newCode, params.businessName).then((res) => {
+        if (res.success) {
+          setFeedbackStatus({
+            type: 'success',
+            message: activeChannel === 'whatsapp'
+              ? `A 6-digit verification code has been sent to your WhatsApp (${parsedPhone.displayPhone}). Please check your WhatsApp messages.`
+              : `A 6-digit verification code has been sent via SMS to ${parsedPhone.carrier.name} (${parsedPhone.displayPhone}). Please check your text messages.`,
+          });
+        } else if (res.requiresKey) {
+          setFeedbackStatus({
+            type: 'warning',
+            message: 'Termii Gateway API Key required for live WhatsApp delivery to Nigerian numbers. Connect your key below or test with code 123456.',
+          });
+          setShowGatewayConfig(true);
+        } else {
+          setFeedbackStatus({
+            type: 'error',
+            message: res.message || 'Failed to dispatch verification code via Termii gateway.',
+          });
+        }
       });
     } else {
       setFeedbackStatus({
         type: 'info',
         message: session.channel === 'whatsapp'
-          ? `A 6-digit verification code was sent to your WhatsApp (${parsedPhone.displayPhone}).`
-          : `A 6-digit verification code was sent via SMS to ${parsedPhone.carrier.name} (${parsedPhone.displayPhone}).`,
+          ? `A 6-digit verification code was requested for your WhatsApp (${parsedPhone.displayPhone}).`
+          : `A 6-digit verification code was requested for ${parsedPhone.carrier.name} SMS (${parsedPhone.displayPhone}).`,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -103,7 +128,7 @@ export default function OtpVerifyScreen() {
     setIsDispatching(true);
     setFeedbackStatus(null);
     try {
-      await dispatchOtp(
+      const res = await dispatchOtp(
         channelToUse,
         phoneNumber,
         undefined,
@@ -114,15 +139,23 @@ export default function OtpVerifyScreen() {
       setTimerCount(45);
       setCanResend(false);
 
-      if (channelToUse === 'whatsapp') {
+      if (res.success) {
         setFeedbackStatus({
           type: 'success',
-          message: `6-digit verification code sent to your WhatsApp (${parsedPhone.displayPhone}). Please check your WhatsApp messages.`,
+          message: channelToUse === 'whatsapp'
+            ? `6-digit verification code sent to your WhatsApp (${parsedPhone.displayPhone}). Please check your WhatsApp messages.`
+            : `6-digit verification code sent via SMS to ${parsedPhone.carrier.name} (${parsedPhone.displayPhone}). Please check your text messages.`,
         });
+      } else if (res.requiresKey) {
+        setFeedbackStatus({
+          type: 'warning',
+          message: 'Termii Gateway API Key required for live WhatsApp delivery to Nigerian numbers. Connect your key below or test with code 123456.',
+        });
+        setShowGatewayConfig(true);
       } else {
         setFeedbackStatus({
-          type: 'success',
-          message: `6-digit verification code sent via SMS to ${parsedPhone.carrier.name} (${parsedPhone.displayPhone}). Please check your text messages.`,
+          type: 'error',
+          message: res.message || 'Failed to dispatch code via Termii gateway. Check your API key or wallet balance.',
         });
       }
     } catch (err: any) {
@@ -133,6 +166,27 @@ export default function OtpVerifyScreen() {
     } finally {
       setIsDispatching(false);
     }
+  };
+
+  // Save Termii API key entered in UI and immediately dispatch code
+  const handleSaveTermiiKey = async () => {
+    if (!inputTermiiKey.trim()) {
+      setFeedbackStatus({
+        type: 'error',
+        message: 'Please enter your Termii API Key (available from your Termii dashboard).',
+      });
+      return;
+    }
+    setIsSavingKey(true);
+    saveTermiiApiKey(inputTermiiKey.trim());
+    setHasGatewayKey(true);
+    setShowGatewayConfig(false);
+    setFeedbackStatus({
+      type: 'info',
+      message: 'Termii Gateway connected! Dispatching WhatsApp verification code now...',
+    });
+    setIsSavingKey(false);
+    await handleSendCode(activeChannel);
   };
 
   // Handle text change inside a digit input box
@@ -170,7 +224,7 @@ export default function OtpVerifyScreen() {
   };
 
   // Verify entered OTP
-  const handleVerify = () => {
+  const handleVerify = async () => {
     const fullCode = digits.join('');
     if (fullCode.length !== 6) {
       setFeedbackStatus({
@@ -183,8 +237,8 @@ export default function OtpVerifyScreen() {
     setIsVerifying(true);
     setFeedbackStatus(null);
 
-    setTimeout(() => {
-      const verification = verifyOtpCode(fullCode, phoneNumber);
+    try {
+      const verification = await verifyOtpCodeAsync(fullCode, phoneNumber);
 
       if (!verification.success) {
         setIsVerifying(false);
@@ -221,7 +275,13 @@ export default function OtpVerifyScreen() {
           router.replace('/(tabs)');
         }
       }, 700);
-    }, 600);
+    } catch (err: any) {
+      setIsVerifying(false);
+      setFeedbackStatus({
+        type: 'error',
+        message: err?.message || 'Verification failed. Please retry.',
+      });
+    }
   };
 
   // Save updated phone number
@@ -438,12 +498,132 @@ export default function OtpVerifyScreen() {
             </View>
           </View>
 
+          {/* Termii Gateway Integration Section */}
+          <View className="mb-4 pt-1">
+            <View
+              className={`rounded-xl border p-3 ${
+                hasGatewayKey
+                  ? 'bg-emerald-50/60 border-emerald-200'
+                  : 'bg-amber-50/70 border-amber-200'
+              }`}
+            >
+              <View className="flex-row items-center justify-between">
+                <View className="flex-row items-center gap-2 flex-1 mr-2">
+                  <View
+                    className={`w-6 h-6 rounded-full items-center justify-center ${
+                      hasGatewayKey ? 'bg-emerald-600' : 'bg-amber-500'
+                    }`}
+                  >
+                    <AppIcon
+                      name={hasGatewayKey ? 'verified' : 'key'}
+                      size={13}
+                      color="#ffffff"
+                    />
+                  </View>
+                  <View className="flex-1">
+                    <Text
+                      className={`text-xs font-bold ${
+                        hasGatewayKey ? 'text-emerald-950' : 'text-amber-950'
+                      }`}
+                    >
+                      {hasGatewayKey ? 'Termii Gateway Connected' : 'Termii WhatsApp Gateway Setup'}
+                    </Text>
+                    <Text className="text-[10px] text-onSurfaceVariant">
+                      {hasGatewayKey
+                        ? 'Live WhatsApp & SMS background delivery enabled'
+                        : 'Required to deliver live WhatsApp OTPs to Nigerian SIMs'}
+                    </Text>
+                  </View>
+                </View>
+
+                <Pressable
+                  onPress={() => setShowGatewayConfig(!showGatewayConfig)}
+                  className="px-2.5 py-1 rounded-lg bg-white border border-cardBorder active:bg-surfaceContainer"
+                >
+                  <Text className="text-[11px] font-bold text-primary">
+                    {showGatewayConfig ? 'Close' : hasGatewayKey ? 'Configure' : 'Connect Key'}
+                  </Text>
+                </Pressable>
+              </View>
+
+              {/* Expandable Gateway Configuration Form */}
+              {showGatewayConfig && (
+                <View className="mt-3 pt-3 border-t border-cardBorder/60 gap-2.5">
+                  <Text className="text-[11px] text-onSurface leading-relaxed">
+                    Termii powers Nigerian telecom routes for WhatsApp Business and carrier SMS (MTN, Airtel, Glo, 9mobile).
+                    Enter your API key below from your{' '}
+                    <Text className="font-bold text-primary">termii.com</Text> dashboard.
+                  </Text>
+
+                  <View className="gap-1.5">
+                    <Text className="text-[10px] font-bold text-onSurfaceVariant uppercase">
+                      Termii API Key (Live or Test)
+                    </Text>
+                    <View className="bg-white border border-cardBorder rounded-xl px-3 h-10 justify-center">
+                      <TextInput
+                        value={inputTermiiKey}
+                        onChangeText={setInputTermiiKey}
+                        placeholder="e.g. TL..."
+                        placeholderTextColor="#94a3b8"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        className="text-xs text-onSurface font-mono outline-none"
+                      />
+                    </View>
+                  </View>
+
+                  <View className="flex-row items-center gap-2 pt-1">
+                    <Pressable
+                      onPress={handleSaveTermiiKey}
+                      disabled={isSavingKey || isDispatching}
+                      className="flex-1 h-9 rounded-xl bg-primary items-center justify-center flex-row gap-1.5 active:bg-secondary"
+                    >
+                      {isSavingKey ? (
+                        <ActivityIndicator size="small" color="#ffffff" />
+                      ) : (
+                        <>
+                          <AppIcon name="save" size={14} color="#ffffff" />
+                          <Text className="text-xs font-bold text-white">Save & Send WhatsApp Code</Text>
+                        </>
+                      )}
+                    </Pressable>
+
+                    {hasGatewayKey && (
+                      <Pressable
+                        onPress={() => {
+                          saveTermiiApiKey('');
+                          setInputTermiiKey('');
+                          setHasGatewayKey(false);
+                          setFeedbackStatus({
+                            type: 'info',
+                            message: 'Termii API Key cleared from this session.',
+                          });
+                        }}
+                        className="px-3 h-9 rounded-xl bg-white border border-cardBorder items-center justify-center active:bg-surfaceContainer"
+                      >
+                        <Text className="text-xs font-semibold text-red-600">Disconnect</Text>
+                      </Pressable>
+                    )}
+                  </View>
+
+                  <View className="bg-white/80 p-2.5 rounded-lg border border-cardBorder/40">
+                    <Text className="text-[10px] text-onSurfaceVariant leading-normal">
+                      💡 <Text className="font-bold text-onSurface">Quick Testing:</Text> If you do not have a Termii key right now, you can test anytime using test code <Text className="font-mono font-bold text-primary">123456</Text> or <Text className="font-mono font-bold text-primary">482900</Text>.
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
+          </View>
+
           {/* Status / Alert Message */}
           {feedbackStatus && (
             <View
               className={`p-3 rounded-xl mb-4 flex-row items-start gap-2 border ${
                 feedbackStatus.type === 'error'
                   ? 'bg-red-50 border-red-200'
+                  : feedbackStatus.type === 'warning'
+                  ? 'bg-amber-50 border-amber-200'
                   : feedbackStatus.type === 'success'
                   ? 'bg-emerald-50 border-emerald-200'
                   : 'bg-blue-50 border-blue-200'
@@ -453,6 +633,8 @@ export default function OtpVerifyScreen() {
                 name={
                   feedbackStatus.type === 'error'
                     ? 'warning'
+                    : feedbackStatus.type === 'warning'
+                    ? 'priority_high'
                     : feedbackStatus.type === 'success'
                     ? 'check_circle'
                     : 'notifications'
@@ -461,6 +643,8 @@ export default function OtpVerifyScreen() {
                 color={
                   feedbackStatus.type === 'error'
                     ? '#dc2626'
+                    : feedbackStatus.type === 'warning'
+                    ? '#d97706'
                     : feedbackStatus.type === 'success'
                     ? '#059669'
                     : '#0284c7'
@@ -470,6 +654,8 @@ export default function OtpVerifyScreen() {
                 className={`text-xs flex-1 leading-snug font-medium ${
                   feedbackStatus.type === 'error'
                     ? 'text-red-800'
+                    : feedbackStatus.type === 'warning'
+                    ? 'text-amber-900'
                     : feedbackStatus.type === 'success'
                     ? 'text-emerald-800'
                     : 'text-blue-800'

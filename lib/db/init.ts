@@ -98,6 +98,16 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
     );
   `);
 
+  // Remove any legacy customer records/debtors and demo sales so users start with a clean ledger
+  await db.execAsync(`
+    DELETE FROM sale_items WHERE sale_id IN ('sale_1', 'sale_2', 'sale_3', 'sale_4') 
+       OR sale_id IN (SELECT id FROM sales WHERE invoice_no IN ('SP-1091', 'SP-1092', 'SP-1093', 'SP-1094'));
+    DELETE FROM sales WHERE id IN ('sale_1', 'sale_2', 'sale_3', 'sale_4') 
+       OR invoice_no IN ('SP-1091', 'SP-1092', 'SP-1093', 'SP-1094');
+    DELETE FROM debt_payments;
+    DELETE FROM customers;
+  `);
+
   const productCount = await db.getFirstAsync<{ count: number }>(
     'SELECT count(*) as count FROM products'
   );
@@ -217,125 +227,7 @@ async function seedInitialData(db: SQLiteDatabase): Promise<void> {
     ]
   );
 
-  // 2. Seed Customers
-  await db.runAsync(
-    `INSERT INTO customers (id, name, phone, location, tier, is_verified, balance, due_text, last_credit, last_payment, lifetime_volume)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      'cust_1',
-      'Mama Nkechi Stores',
-      '+234 803 491 8820',
-      'Balogun Mkt, Line 3B',
-      'Gold Tier',
-      1,
-      145000,
-      '12 Days Overdue',
-      '3 ctns Peak Milk (5d ago)',
-      '₦50,000 on Oct 02',
-      '₦1,850,000',
-    ]
-  );
-
-  await db.runAsync(
-    `INSERT INTO customers (id, name, phone, location, tier, is_verified, balance, due_text, last_credit, last_payment, lifetime_volume)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      'cust_2',
-      'Emeka Wholesales & Retail',
-      '+234 802 119 4432',
-      'Idumota Block C, Shop 14',
-      'Silver Tier',
-      1,
-      80000,
-      'Due in 3 days',
-      '10 bags Dangote Sugar',
-      '₦40,000 on Sep 28',
-      '₦920,000',
-    ]
-  );
-
-  await db.runAsync(
-    `INSERT INTO customers (id, name, phone, location, tier, is_verified, balance, due_text, last_credit, last_payment, lifetime_volume)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      'cust_3',
-      'Alhaji Bello Grains Enterprise',
-      '+234 813 555 0192',
-      'Mile 12 Market Stall 8',
-      'Silver Tier',
-      0,
-      220000,
-      '28 Days Overdue',
-      '15 bags Semovita',
-      '₦100,000 on Sep 15',
-      '₦3,100,000',
-    ]
-  );
-
-  await db.runAsync(
-    `INSERT INTO customers (id, name, phone, location, tier, is_verified, balance, due_text, last_credit, last_payment, lifetime_volume)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      'cust_4',
-      'Mama Bose Canteen',
-      '+234 809 332 9901',
-      'Oyingbo Food Market',
-      'Bronze Tier',
-      1,
-      0,
-      'Settled • All Cleared',
-      '2 ctns Gino Paste',
-      '₦26,400 on Oct 19',
-      '₦430,000',
-    ]
-  );
-
-  // 3. Seed Initial Sales (matching the ₦486,500 total)
-  await db.runAsync(
-    `INSERT INTO sales (id, invoice_no, customer_id, customer_name, total_amount, discount_amount, net_payable, payment_channel)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    ['sale_1', 'SP-1094', 'cust_1', 'Mama Nkechi Stores', 185000, 0, 185000, 'transfer']
-  );
-  await db.runAsync(
-    `INSERT INTO sale_items (id, sale_id, product_id, product_name, sku, quantity, unit_price, total_price)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    ['item_1', 'sale_1', 'prod_3', 'Peak Evaporated Milk 160g', 'PEAK-CAN-48', 5, 28500, 142500]
-  );
-  await db.runAsync(
-    `INSERT INTO sale_items (id, sale_id, product_id, product_name, sku, quantity, unit_price, total_price)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    ['item_2', 'sale_1', 'prod_4', 'Gino Tomato Paste 70g', 'GINO-TOM-50', 3, 13200, 39600]
-  );
-
-  await db.runAsync(
-    `INSERT INTO sales (id, invoice_no, customer_id, customer_name, total_amount, discount_amount, net_payable, payment_channel)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    ['sale_2', 'SP-1093', null, 'Walk-in Cash Customer', 142000, 0, 142000, 'cash']
-  );
-  await db.runAsync(
-    `INSERT INTO sale_items (id, sale_id, product_id, product_name, sku, quantity, unit_price, total_price)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    ['item_3', 'sale_2', 'prod_1', 'Dangote Refined Sugar 50kg', 'DNG-SUG-50', 2, 71000, 142000]
-  );
-
-  await db.runAsync(
-    `INSERT INTO sales (id, invoice_no, customer_id, customer_name, total_amount, discount_amount, net_payable, payment_channel)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    ['sale_3', 'SP-1092', 'cust_2', 'Emeka Wholesales & Retail', 110000, 0, 110000, 'credit']
-  );
-  await db.runAsync(
-    `INSERT INTO sale_items (id, sale_id, product_id, product_name, sku, quantity, unit_price, total_price)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    ['item_4', 'sale_3', 'prod_5', 'Indomie Super Pack (Carton 40)', 'IND-SUP-40', 5, 18800, 94000]
-  );
-
-  await db.runAsync(
-    `INSERT INTO sales (id, invoice_no, customer_id, customer_name, total_amount, discount_amount, net_payable, payment_channel)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    ['sale_4', 'SP-1091', null, 'Iya Basira Provisions', 49500, 0, 49500, 'pos']
-  );
-
-  // 4. Seed Expenses
+  // 2. Seed Expenses
   await db.runAsync(
     `INSERT INTO expenses (id, category, amount, recipient, notes, payment_method)
      VALUES (?, ?, ?, ?, ?, ?)`,

@@ -239,9 +239,9 @@ export default function CustomersLedgerScreen() {
                 Credit Ledger & Receivables
               </Text>
             </View>
-            <View className="flex-row items-center gap-1 px-2.5 py-0.5 rounded-full bg-errorContainer">
-              <View className="w-1.5 h-1.5 rounded-full bg-error" />
-              <Text className="text-xs font-bold text-onErrorContainer">
+            <View className={`flex-row items-center gap-1 px-2.5 py-0.5 rounded-full ${overdueCount > 0 ? 'bg-errorContainer' : 'bg-secondaryContainer'}`}>
+              <View className={`w-1.5 h-1.5 rounded-full ${overdueCount > 0 ? 'bg-error' : 'bg-primary'}`} />
+              <Text className={`text-xs font-bold ${overdueCount > 0 ? 'text-onErrorContainer' : 'text-onSecondaryContainer'}`}>
                 {overdueCount > 0 ? `High Risk: ${overdueCount} Overdue` : 'All Accounts Good'}
               </Text>
             </View>

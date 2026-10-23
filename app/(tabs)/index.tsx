@@ -159,12 +159,20 @@ export default function HomeDashboardScreen() {
               ₦{todaySales.toLocaleString()}
             </Text>
             <View className="gap-0.5">
-              <View className="self-start flex-row items-center px-1.5 py-0.5 rounded bg-secondaryContainer/70">
-                <AppIcon name="trending_up" size={12} color={colors.onSecondaryContainer} />
-                <Text className="text-[11px] font-bold text-onSecondaryContainer ml-0.5">
-                  +{metrics?.salesGrowthPct ?? 14.8}%
-                </Text>
-              </View>
+              {todaySales > 0 ? (
+                <View className="self-start flex-row items-center px-1.5 py-0.5 rounded bg-secondaryContainer/70">
+                  <AppIcon name="trending_up" size={12} color={colors.onSecondaryContainer} />
+                  <Text className="text-[11px] font-bold text-onSecondaryContainer ml-0.5">
+                    +{metrics?.salesGrowthPct ?? 0}%
+                  </Text>
+                </View>
+              ) : (
+                <View className="self-start px-1.5 py-0.5 rounded bg-surfaceContainer">
+                  <Text className="text-[11px] font-semibold text-onSurfaceVariant">
+                    No sales today
+                  </Text>
+                </View>
+              )}
               <Text className="text-[11px] text-onSurfaceVariant">
                 {salesCount} {salesCount === 1 ? 'transaction' : 'transactions'}
               </Text>
@@ -331,44 +339,60 @@ export default function HomeDashboardScreen() {
             </View>
           </View>
 
-          {/* Bar Chart Visualization */}
-          <View className="h-32 flex-row items-end justify-between px-1 mb-3">
-            {hourlyData.map((item, index) => (
-              <View key={index} className="flex-1 items-center justify-end h-full px-1">
-                <Text
-                  className={`text-[10px] mb-1 font-semibold ${
-                    item.isPeak ? 'text-primary font-bold' : 'text-onSurfaceVariant'
-                  }`}
-                >
-                  {item.amount}
-                </Text>
-                <View
-                  style={{ height: `${item.heightPct}%` }}
-                  className={`w-full rounded-t-md ${
-                    item.isPeak ? 'bg-primary' : 'bg-secondaryContainer'
-                  }`}
-                />
-                <Text
-                  className={`text-[10px] mt-1.5 ${
-                    item.isPeak ? 'text-primary font-bold' : 'text-onSurfaceVariant'
-                  }`}
-                >
-                  {item.hour}
-                </Text>
+          {todaySales === 0 ? (
+            <View className="py-7 items-center justify-center">
+              <View className="w-10 h-10 rounded-full bg-surfaceContainer items-center justify-center mb-2">
+                <AppIcon name="bar_chart" size={20} color={colors.onSurfaceVariant} />
               </View>
-            ))}
-          </View>
-
-          {/* Peak Observation Tag */}
-          <View className="flex-row items-center justify-between p-2.5 rounded-lg bg-surfaceContainerLow">
-            <View className="flex-row items-center gap-1.5 flex-1 mr-2">
-              <AppIcon name="local_fire_department" size={18} color={colors.primary} />
-              <Text className="text-xs text-onSurface truncate">
-                <Text className="font-bold">Peak: 12:00 – 14:00</Text> • Alaba & Idumota offloading
+              <Text className="text-xs font-semibold text-onSurfaceVariant">
+                No sales recorded yet today
+              </Text>
+              <Text className="text-[11px] text-outline mt-0.5 text-center">
+                Hourly activity will track automatically when sales occur
               </Text>
             </View>
-            <Text className="text-xs font-bold text-primary">₦252k</Text>
-          </View>
+          ) : (
+            <>
+              {/* Bar Chart Visualization */}
+              <View className="h-32 flex-row items-end justify-between px-1 mb-3">
+                {hourlyData.map((item, index) => (
+                  <View key={index} className="flex-1 items-center justify-end h-full px-1">
+                    <Text
+                      className={`text-[10px] mb-1 font-semibold ${
+                        item.isPeak ? 'text-primary font-bold' : 'text-onSurfaceVariant'
+                      }`}
+                    >
+                      {item.amount}
+                    </Text>
+                    <View
+                      style={{ height: `${item.heightPct}%` }}
+                      className={`w-full rounded-t-md ${
+                        item.isPeak ? 'bg-primary' : 'bg-secondaryContainer'
+                      }`}
+                    />
+                    <Text
+                      className={`text-[10px] mt-1.5 ${
+                        item.isPeak ? 'text-primary font-bold' : 'text-onSurfaceVariant'
+                      }`}
+                    >
+                      {item.hour}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* Peak Observation Tag */}
+              <View className="flex-row items-center justify-between p-2.5 rounded-lg bg-surfaceContainerLow">
+                <View className="flex-row items-center gap-1.5 flex-1 mr-2">
+                  <AppIcon name="local_fire_department" size={18} color={colors.primary} />
+                  <Text className="text-xs text-onSurface truncate">
+                    <Text className="font-bold">Peak: 12:00 – 14:00</Text> • Alaba & Idumota offloading
+                  </Text>
+                </View>
+                <Text className="text-xs font-bold text-primary">₦252k</Text>
+              </View>
+            </>
+          )}
         </View>
 
         {/* Business Critical Action Needed Stack */}

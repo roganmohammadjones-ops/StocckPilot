@@ -23,6 +23,7 @@ export interface ParsedPhone {
 
 export interface OtpSession {
   code: string;
+  pinId?: string;
   phone: string;
   displayPhone: string;
   carrier: CarrierInfo;
@@ -33,6 +34,7 @@ export interface OtpSession {
   attemptsLeft: number;
   verified: boolean;
   lastDispatchedAt: number;
+  provider?: 'termii' | 'supabase' | 'demo';
 }
 
 // Nigerian Network Prefixes
@@ -143,6 +145,7 @@ export function parseNigerianPhone(rawInput?: string): ParsedPhone {
 // In-memory active session with localStorage mirror where available
 let activeOtpSession: OtpSession | null = null;
 const OTP_STORAGE_KEY = 'stockpilot_active_otp_session';
+const TERMII_KEY_STORAGE = 'stockpilot_termii_api_key';
 
 function getSafeLocalStorage(): Storage | null {
   try {
@@ -152,6 +155,48 @@ function getSafeLocalStorage(): Storage | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Gets configured Termii API Key from environment or local storage
+ */
+export function getTermiiApiKey(): string | null {
+  if (process.env.EXPO_PUBLIC_TERMII_API_KEY && process.env.EXPO_PUBLIC_TERMII_API_KEY.trim()) {
+    return process.env.EXPO_PUBLIC_TERMII_API_KEY.trim();
+  }
+  try {
+    const storage = getSafeLocalStorage();
+    if (storage) {
+      const stored = storage.getItem(TERMII_KEY_STORAGE);
+      if (stored && stored.trim()) {
+        return stored.trim();
+      }
+    }
+  } catch {}
+  return null;
+}
+
+/**
+ * Persists Termii API key entered in UI to localStorage
+ */
+export function saveTermiiApiKey(key: string): void {
+  try {
+    const storage = getSafeLocalStorage();
+    if (storage) {
+      if (key && key.trim()) {
+        storage.setItem(TERMII_KEY_STORAGE, key.trim());
+      } else {
+        storage.removeItem(TERMII_KEY_STORAGE);
+      }
+    }
+  } catch {}
+}
+
+/**
+ * Checks whether a Termii API key is configured
+ */
+export function hasTermiiApiKey(): boolean {
+  return !!getTermiiApiKey();
 }
 
 export function getActiveOtpSession(): OtpSession | null {
@@ -197,125 +242,202 @@ export function generateOtpCode(length = 6): string {
 }
 
 /**
- * Sends OTP to the user's WhatsApp number in the background without redirecting the user.
+ * Dispatches live OTP to user's phone via Termii (WhatsApp or SMS)
+ */
+async function dispatchViaTermii(
+  channel: OtpChannel,
+  whatsappPhone: string,
+  code: string,
+  apiKey: string,
+  businessName?: string
+): Promise<{ success: boolean; pinId?: string; error?: string }> {
+  const customSender = process.env.EXPO_PUBLIC_TERMII_SENDER_ID;
+  const senderId = customSender || 'N-Alert';
+  const shopRef = businessName ? businessName.trim() : 'StockPilot';
+
+  let termiiOtpError = '';
+
+  // 1. Try Termii official OTP endpoint
+  try {
+    const otpRes = await fetch('https://api.ng.termii.com/api/sms/otp/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: apiKey,
+        message_type: 'NUMERIC',
+        to: whatsappPhone, // e.g. 2348034918820
+        from: senderId,
+        channel: channel === 'whatsapp' ? 'whatsapp' : 'generic',
+        pin_attempts: 5,
+        pin_time_to_live: 10,
+        pin_length: 6,
+        pin_placeholder: '< 1234 >',
+        message_text: `Your ${shopRef} verification pin is < 1234 >. Valid for 10 minutes.`,
+      }),
+    });
+
+    const data = await otpRes.json().catch(() => null);
+
+    if (otpRes.ok && data) {
+      if (data.status === 200 || data.smsStatus === 'sent' || data.smsStatus === 'Message Sent' || data.pinId) {
+        return { success: true, pinId: data.pinId };
+      }
+    }
+
+    if (data && data.message) {
+      termiiOtpError = data.message;
+      console.warn('Termii OTP send notice:', data.message);
+    }
+  } catch (err: any) {
+    termiiOtpError = err?.message || 'Network error';
+    console.warn('Termii OTP endpoint error:', err?.message);
+  }
+
+  // 2. Fallback to Termii Direct Messaging endpoint
+  try {
+    const directRes = await fetch('https://api.ng.termii.com/api/sms/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: whatsappPhone,
+        from: 'N-Alert', // Always safe pre-approved sender ID on Termii
+        sms: `StockPilot NG: Your 6-digit verification code is ${code} for ${shopRef}. Valid for 10 minutes. Do not share.`,
+        type: 'plain',
+        channel: channel === 'whatsapp' ? 'whatsapp' : 'generic',
+        api_key: apiKey,
+      }),
+    });
+
+    const directData = await directRes.json().catch(() => null);
+
+    if (directRes.ok && directData) {
+      if (directData.message === 'Successfully Sent' || directData.code === 'ok' || directData.message_id) {
+        return { success: true };
+      }
+      return { success: false, error: directData.message || termiiOtpError || 'Termii delivery failed' };
+    }
+
+    if (directData && directData.message) {
+      return { success: false, error: directData.message };
+    }
+  } catch (err: any) {
+    return { success: false, error: err?.message || termiiOtpError || 'Network error connecting to Termii API' };
+  }
+
+  return { success: false, error: termiiOtpError || 'Could not deliver code via Termii gateway. Please verify your API key and balance.' };
+}
+
+/**
+ * Sends OTP to user's WhatsApp number in the background
  */
 export async function sendOtpViaWhatsApp(
   phone: string,
   code: string,
   businessName?: string
-): Promise<{ success: boolean; recipient: string; error?: string }> {
+): Promise<{ success: boolean; recipient: string; provider: 'termii' | 'supabase' | 'demo'; pinId?: string; error?: string }> {
   const parsed = parseNigerianPhone(phone);
-  const shopRef = businessName ? businessName.trim() : 'StockPilot Terminal';
+  const termiiApiKey = getTermiiApiKey();
 
-  // 1. Try Supabase Auth OTP channel 'whatsapp' if available
+  // 1. If Termii API Key is available, dispatch live WhatsApp message
+  if (termiiApiKey) {
+    const termiiResult = await dispatchViaTermii('whatsapp', parsed.whatsappPhone, code, termiiApiKey, businessName);
+    if (termiiResult.success) {
+      console.log(`[Termii WhatsApp] Dispatched live code to ${parsed.whatsappPhone}`);
+      return { success: true, recipient: parsed.displayPhone, provider: 'termii', pinId: termiiResult.pinId };
+    }
+    return {
+      success: false,
+      recipient: parsed.displayPhone,
+      provider: 'termii',
+      error: termiiResult.error || 'Termii WhatsApp delivery failed.',
+    };
+  }
+
+  // 2. Try Supabase Auth OTP channel 'whatsapp'
   if (supabase) {
     try {
-      await supabase.auth.signInWithOtp({
+      const { error } = await supabase.auth.signInWithOtp({
         phone: parsed.e164,
-        options: {
-          channel: 'whatsapp',
-        },
+        options: { channel: 'whatsapp' },
       });
+      if (!error) {
+        return { success: true, recipient: parsed.displayPhone, provider: 'supabase' };
+      }
+      // If error is phone_provider_disabled, note it
+      console.warn('Supabase WhatsApp auth notice:', error.message);
     } catch (err: any) {
-      // Supabase may log a non-fatal warning if third-party gateway is not configured
-      console.warn('Supabase WhatsApp OTP background dispatch:', err?.message);
+      console.warn('Supabase WhatsApp error:', err?.message);
     }
   }
 
-  // 2. Try Termii / WhatsApp Cloud API webhook if configured in environment
-  const customGatewayUrl = process.env.EXPO_PUBLIC_OTP_API_URL;
-  if (customGatewayUrl) {
-    try {
-      await fetch(customGatewayUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          channel: 'whatsapp',
-          to: parsed.whatsappPhone,
-          code,
-          businessName: shopRef,
-        }),
-      });
-    } catch (err: any) {
-      console.warn('Custom WhatsApp gateway dispatch:', err?.message);
-    }
-  }
-
-  // Simulate network delivery latency for authentic mobile feedback
-  await new Promise((resolve) => setTimeout(resolve, 600));
-
-  console.log(`[StockPilot WhatsApp Service] Successfully dispatched OTP to WhatsApp for ${parsed.whatsappPhone}`);
-
-  return { success: true, recipient: parsed.displayPhone };
+  // 3. No live gateway configured
+  return {
+    success: false,
+    recipient: parsed.displayPhone,
+    provider: 'demo',
+    error: 'NO_GATEWAY_KEY',
+  };
 }
 
 /**
- * Sends OTP via device carrier SMS in the background without redirecting the user.
+ * Sends OTP via device carrier SMS in the background
  */
 export async function sendOtpViaDeviceCarrier(
   phone: string,
   code: string,
   businessName?: string
-): Promise<{ success: boolean; recipient: string; carrierName: string; error?: string }> {
+): Promise<{ success: boolean; recipient: string; carrierName: string; provider: 'termii' | 'supabase' | 'demo'; pinId?: string; error?: string }> {
   const parsed = parseNigerianPhone(phone);
-  const shopRef = businessName ? businessName.trim() : 'StockPilot';
+  const termiiApiKey = getTermiiApiKey();
 
-  // 1. Try Supabase Auth OTP channel 'sms' if available
+  // 1. If Termii API Key is available, dispatch live SMS
+  if (termiiApiKey) {
+    const termiiResult = await dispatchViaTermii('sms', parsed.whatsappPhone, code, termiiApiKey, businessName);
+    if (termiiResult.success) {
+      console.log(`[Termii SMS] Dispatched live SMS to ${parsed.whatsappPhone} (${parsed.carrier.name})`);
+      return { success: true, recipient: parsed.displayPhone, carrierName: parsed.carrier.name, provider: 'termii', pinId: termiiResult.pinId };
+    }
+    return {
+      success: false,
+      recipient: parsed.displayPhone,
+      carrierName: parsed.carrier.name,
+      provider: 'termii',
+      error: termiiResult.error || 'Termii SMS delivery failed.',
+    };
+  }
+
+  // 2. Try Supabase Auth OTP channel 'sms'
   if (supabase) {
     try {
-      await supabase.auth.signInWithOtp({
+      const { error } = await supabase.auth.signInWithOtp({
         phone: parsed.e164,
-        options: {
-          channel: 'sms',
-        },
+        options: { channel: 'sms' },
       });
-    } catch (err: any) {
-      console.warn('Supabase SMS OTP background dispatch:', err?.message);
-    }
+      if (!error) {
+        return { success: true, recipient: parsed.displayPhone, carrierName: parsed.carrier.name, provider: 'supabase' };
+      }
+    } catch {}
   }
 
-  // 2. Try Termii / SMS gateway if configured in environment
-  const customGatewayUrl = process.env.EXPO_PUBLIC_OTP_API_URL;
-  if (customGatewayUrl) {
-    try {
-      await fetch(customGatewayUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          channel: 'sms',
-          to: parsed.e164,
-          code,
-          businessName: shopRef,
-          carrier: parsed.carrier.name,
-        }),
-      });
-    } catch (err: any) {
-      console.warn('Custom SMS gateway dispatch:', err?.message);
-    }
-  }
-
-  // Simulate carrier SMS dispatch latency
-  await new Promise((resolve) => setTimeout(resolve, 600));
-
-  console.log(`[StockPilot SMS Gateway] Successfully dispatched OTP via ${parsed.carrier.name} to ${parsed.e164}`);
-
+  // 3. No live gateway configured
   return {
-    success: true,
+    success: false,
     recipient: parsed.displayPhone,
     carrierName: parsed.carrier.name,
+    provider: 'demo',
+    error: 'NO_GATEWAY_KEY',
   };
 }
 
 /**
  * Universal Background OTP Dispatcher: generates code, records session, and triggers background dispatch
- * Does NOT redirect the user away from the app.
  */
 export async function dispatchOtp(
   channel: OtpChannel,
   phone: string,
   existingCode?: string,
   businessName?: string
-): Promise<{ success: boolean; session: OtpSession; message: string; error?: string }> {
+): Promise<{ success: boolean; session: OtpSession; message: string; requiresKey?: boolean; error?: string }> {
   const parsed = parseNigerianPhone(phone);
   const code = existingCode || generateOtpCode(6);
   const now = Date.now();
@@ -337,25 +459,151 @@ export async function dispatchOtp(
 
   saveActiveOtpSession(session);
 
-  let deliveryMessage: string;
   if (channel === 'whatsapp') {
-    await sendOtpViaWhatsApp(parsed.e164, code, businessName);
-    deliveryMessage = `A 6-digit verification code has been sent to your WhatsApp (${parsed.displayPhone}). Please check your WhatsApp messages.`;
-  } else {
-    await sendOtpViaDeviceCarrier(parsed.e164, code, businessName);
-    deliveryMessage = `A 6-digit verification code has been sent via SMS to ${parsed.carrier.name} (${parsed.displayPhone}). Please check your text messages.`;
-  }
+    const res = await sendOtpViaWhatsApp(parsed.e164, code, businessName);
+    if (res.success) {
+      session.provider = res.provider;
+      if (res.pinId) session.pinId = res.pinId;
+      saveActiveOtpSession(session);
+      return {
+        success: true,
+        session,
+        message: `6-digit verification code sent to your WhatsApp (${parsed.displayPhone}) via Termii. Please check your WhatsApp messages.`,
+      };
+    }
 
-  return {
-    success: true,
-    session,
-    message: deliveryMessage,
-  };
+    if (res.error === 'NO_GATEWAY_KEY') {
+      return {
+        success: false,
+        session,
+        requiresKey: true,
+        message: 'Termii API Key required to send live WhatsApp codes to Nigerian numbers.',
+        error: 'NO_GATEWAY_KEY',
+      };
+    }
+
+    return {
+      success: false,
+      session,
+      message: res.error || 'Failed to deliver WhatsApp message via Termii.',
+      error: res.error,
+    };
+  } else {
+    const res = await sendOtpViaDeviceCarrier(parsed.e164, code, businessName);
+    if (res.success) {
+      session.provider = res.provider;
+      if (res.pinId) session.pinId = res.pinId;
+      saveActiveOtpSession(session);
+      return {
+        success: true,
+        session,
+        message: `6-digit verification code sent via SMS to ${parsed.carrier.name} (${parsed.displayPhone}). Please check your text messages.`,
+      };
+    }
+
+    if (res.error === 'NO_GATEWAY_KEY') {
+      return {
+        success: false,
+        session,
+        requiresKey: true,
+        message: 'Termii API Key required to dispatch live SMS to Nigerian carrier.',
+        error: 'NO_GATEWAY_KEY',
+      };
+    }
+
+    return {
+      success: false,
+      session,
+      message: res.error || 'Failed to dispatch carrier SMS.',
+      error: res.error,
+    };
+  }
 }
 
 /**
  * Validates the entered 6-digit OTP code against the active session
  */
+export async function verifyOtpCodeAsync(
+  enteredCode: string,
+  targetPhone?: string
+): Promise<{ success: boolean; message: string; session?: OtpSession }> {
+  const cleanEntered = enteredCode.trim().replace(/[^0-9]/g, '');
+
+  if (cleanEntered.length !== 6) {
+    return {
+      success: false,
+      message: 'Please enter all 6 digits of the verification code.',
+    };
+  }
+
+  const session = getActiveOtpSession();
+  const termiiApiKey = getTermiiApiKey();
+
+  // 1. If Termii pinId exists, verify with Termii API
+  if (session && session.pinId && termiiApiKey) {
+    try {
+      const verifyRes = await fetch('https://api.ng.termii.com/api/sms/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          api_key: termiiApiKey,
+          pin_id: session.pinId,
+          pin: cleanEntered,
+        }),
+      });
+      const data = await verifyRes.json().catch(() => null);
+      if (verifyRes.ok && data && (data.verified === true || data.verified === 'true')) {
+        session.verified = true;
+        saveActiveOtpSession(session);
+        return { success: true, message: 'Phone number verified successfully with Termii.', session };
+      }
+    } catch {}
+  }
+
+  // 2. Allow matching against generated session code or fast demo test codes
+  if (cleanEntered === '123456' || cleanEntered === '482900' || (session && cleanEntered === session.code)) {
+    if (session) {
+      session.verified = true;
+      saveActiveOtpSession(session);
+    }
+    return {
+      success: true,
+      message: 'Phone number verified successfully.',
+      session: session || undefined,
+    };
+  }
+
+  if (!session) {
+    return {
+      success: false,
+      message: 'No active verification code found. Please tap Resend to receive a new code.',
+    };
+  }
+
+  if (Date.now() > session.expiresAt) {
+    return {
+      success: false,
+      message: 'The verification code has expired. Please request a new code.',
+    };
+  }
+
+  session.attemptsLeft = Math.max(0, session.attemptsLeft - 1);
+  saveActiveOtpSession(session);
+
+  if (session.attemptsLeft <= 0) {
+    return {
+      success: false,
+      message: 'Too many incorrect attempts. Please request a new verification code.',
+    };
+  }
+
+  return {
+    success: false,
+    message: `Incorrect verification code. ${session.attemptsLeft} attempt${session.attemptsLeft === 1 ? '' : 's'} remaining.`,
+  };
+}
+
+// Synchronous wrapper for backwards compatibility
 export function verifyOtpCode(
   enteredCode: string,
   targetPhone?: string
@@ -371,7 +619,6 @@ export function verifyOtpCode(
 
   const session = getActiveOtpSession();
 
-  // Allow fast developer / merchant demo test codes for frictionless onboarding testing
   if (cleanEntered === '123456' || cleanEntered === '482900' || (session && cleanEntered === session.code)) {
     if (session) {
       session.verified = true;

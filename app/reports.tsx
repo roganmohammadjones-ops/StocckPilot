@@ -55,7 +55,7 @@ export default function ReportsScreen() {
 
   const grossSales = report?.grossSales ?? 0;
   const grossProfit = report?.grossProfit ?? 0;
-  const grossMarginPct = report?.grossMarginPct ?? 14.5;
+  const grossMarginPct = report?.grossMarginPct ?? 0;
   const totalExpenses = report?.totalExpenses ?? 0;
   const netTakeHome = report?.netTakeHome ?? 0;
   const salesCount = report?.salesCount ?? 0;
@@ -63,11 +63,11 @@ export default function ReportsScreen() {
   const currentRec = report?.currentReceivables ?? 0;
   const dueSoonRec = report?.dueSoonReceivables ?? 0;
   const overdueRec = report?.overdueReceivables ?? 0;
-  const totalRec = report?.totalReceivables || 1;
+  const totalRec = report?.totalReceivables || 0;
 
-  const currentPct = Math.round((currentRec / totalRec) * 100);
-  const dueSoonPct = Math.round((dueSoonRec / totalRec) * 100);
-  const overduePct = Math.max(0, 100 - currentPct - dueSoonPct);
+  const currentPct = totalRec > 0 ? Math.round((currentRec / totalRec) * 100) : 0;
+  const dueSoonPct = totalRec > 0 ? Math.round((dueSoonRec / totalRec) * 100) : 0;
+  const overduePct = totalRec > 0 ? Math.max(0, 100 - currentPct - dueSoonPct) : 0;
 
   const handleShareSummaryWhatsApp = () => {
     const message = `*StockPilot Daily Closeout Report*%0A` +
@@ -377,63 +377,82 @@ export default function ReportsScreen() {
             </View>
 
             {/* Weekly Revenue vs COGS Visualizer */}
+            {/* Sales & Landed Cost Trend */}
             <View className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm mb-4">
               <View className="flex-row items-center justify-between mb-3">
                 <View>
                   <Text className="text-sm font-bold text-onSurface">Sales & Landed Cost Trend</Text>
                   <Text className="text-xs text-onSurfaceVariant">
-                    Weekly velocity in Idumota warehouse
+                    Weekly velocity tracking
                   </Text>
                 </View>
-                <View className="flex-row items-center gap-2">
-                  <View className="flex-row items-center gap-1">
-                    <View className="w-2.5 h-2.5 rounded-full bg-primary" />
-                    <Text className="text-[11px] text-onSurfaceVariant">Sales</Text>
-                  </View>
-                  <View className="flex-row items-center gap-1">
-                    <View className="w-2.5 h-2.5 rounded-full bg-surfaceContainerHighest" />
-                    <Text className="text-[11px] text-onSurfaceVariant">Cost</Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Bar Chart Bars */}
-              <View className="h-40 flex-row items-end justify-between px-2 pt-4 pb-2 border-b border-cardBorder">
-                {weeklyTrend.map((item, idx) => (
-                  <View key={idx} className="flex-1 items-center justify-end h-full">
-                    <Text
-                      className={`text-[10px] mb-1 font-bold ${
-                        item.isPeak ? 'text-primary' : 'text-onSurfaceVariant'
-                      }`}
-                    >
-                      {item.sales}
-                    </Text>
-                    <View className="flex-row items-end gap-1 h-28">
-                      <View
-                        style={{ height: `${item.salesH}%` }}
-                        className="w-3.5 rounded-t bg-primary"
-                      />
-                      <View
-                        style={{ height: `${item.costH}%` }}
-                        className="w-3.5 rounded-t bg-surfaceContainerHighest"
-                      />
+                {grossSales > 0 && (
+                  <View className="flex-row items-center gap-2">
+                    <View className="flex-row items-center gap-1">
+                      <View className="w-2.5 h-2.5 rounded-full bg-primary" />
+                      <Text className="text-[11px] text-onSurfaceVariant">Sales</Text>
                     </View>
-                    <Text
-                      className={`text-xs mt-2 ${
-                        item.isPeak ? 'font-bold text-primary' : 'text-onSurfaceVariant'
-                      }`}
-                    >
-                      {item.week}
-                    </Text>
+                    <View className="flex-row items-center gap-1">
+                      <View className="w-2.5 h-2.5 rounded-full bg-surfaceContainerHighest" />
+                      <Text className="text-[11px] text-onSurfaceVariant">Cost</Text>
+                    </View>
                   </View>
-                ))}
+                )}
               </View>
 
-              {/* Efficiency Summary */}
-              <View className="flex-row items-center justify-between pt-3">
-                <Text className="text-xs text-onSurfaceVariant">Operating Gross Margin:</Text>
-                <Text className="text-xs font-bold text-primary">{grossMarginPct}% Average</Text>
-              </View>
+              {grossSales === 0 ? (
+                <View className="py-8 items-center justify-center">
+                  <View className="w-10 h-10 rounded-full bg-surfaceContainer items-center justify-center mb-2">
+                    <AppIcon name="query_stats" size={20} color={colors.onSurfaceVariant} />
+                  </View>
+                  <Text className="text-xs font-semibold text-onSurfaceVariant">
+                    No sales recorded for this period yet
+                  </Text>
+                  <Text className="text-[11px] text-outline mt-0.5 text-center">
+                    Weekly sales velocity and margin analysis will appear here as orders are placed.
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  {/* Bar Chart Bars */}
+                  <View className="h-40 flex-row items-end justify-between px-2 pt-4 pb-2 border-b border-cardBorder">
+                    {weeklyTrend.map((item, idx) => (
+                      <View key={idx} className="flex-1 items-center justify-end h-full">
+                        <Text
+                          className={`text-[10px] mb-1 font-bold ${
+                            item.isPeak ? 'text-primary' : 'text-onSurfaceVariant'
+                          }`}
+                        >
+                          {item.sales}
+                        </Text>
+                        <View className="flex-row items-end gap-1 h-28">
+                          <View
+                            style={{ height: `${item.salesH}%` }}
+                            className="w-3.5 rounded-t bg-primary"
+                          />
+                          <View
+                            style={{ height: `${item.costH}%` }}
+                            className="w-3.5 rounded-t bg-surfaceContainerHighest"
+                          />
+                        </View>
+                        <Text
+                          className={`text-xs mt-2 ${
+                            item.isPeak ? 'font-bold text-primary' : 'text-onSurfaceVariant'
+                          }`}
+                        >
+                          {item.week}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  {/* Efficiency Summary */}
+                  <View className="flex-row items-center justify-between pt-3">
+                    <Text className="text-xs text-onSurfaceVariant">Operating Gross Margin:</Text>
+                    <Text className="text-xs font-bold text-primary">{grossMarginPct}% Average</Text>
+                  </View>
+                </>
+              )}
             </View>
           </>
         )}

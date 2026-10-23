@@ -200,164 +200,9 @@ function getSeedData(): WebStoreData {
         created_at: '2026-10-18T13:00:00Z',
       },
     ],
-    customers: [
-      {
-        id: 'cust_1',
-        name: 'Mama Nkechi Stores',
-        phone: '+234 803 491 8820',
-        location: 'Balogun Mkt, Line 3B',
-        tier: 'Gold Tier',
-        is_verified: 1,
-        credit_limit: 500000,
-        balance: 145000,
-        due_text: '12 Days Overdue',
-        last_credit: '3 ctns Peak Milk (5d ago)',
-        last_payment: '₦50,000 on Oct 02',
-        lifetime_volume: '₦1,850,000',
-        created_at: '2026-10-15T08:00:00Z',
-      },
-      {
-        id: 'cust_2',
-        name: 'Emeka Wholesales & Retail',
-        phone: '+234 802 119 4432',
-        location: 'Idumota Block C, Shop 14',
-        tier: 'Silver Tier',
-        is_verified: 1,
-        credit_limit: 500000,
-        balance: 80000,
-        due_text: 'Due in 3 days',
-        last_credit: '10 bags Dangote Sugar',
-        last_payment: '₦40,000 on Sep 28',
-        lifetime_volume: '₦920,000',
-        created_at: '2026-10-16T08:00:00Z',
-      },
-      {
-        id: 'cust_3',
-        name: 'Alhaji Bello Grains Enterprise',
-        phone: '+234 813 555 0192',
-        location: 'Mile 12 Market Stall 8',
-        tier: 'Silver Tier',
-        is_verified: 0,
-        credit_limit: 500000,
-        balance: 220000,
-        due_text: '28 Days Overdue',
-        last_credit: '15 bags Semovita',
-        last_payment: '₦100,000 on Sep 15',
-        lifetime_volume: '₦3,100,000',
-        created_at: '2026-10-17T08:00:00Z',
-      },
-      {
-        id: 'cust_4',
-        name: 'Mama Bose Canteen',
-        phone: '+234 809 332 9901',
-        location: 'Oyingbo Food Market',
-        tier: 'Bronze Tier',
-        is_verified: 1,
-        credit_limit: 200000,
-        balance: 0,
-        due_text: 'Settled • All Cleared',
-        last_credit: '2 ctns Gino Paste',
-        last_payment: '₦26,400 on Oct 19',
-        lifetime_volume: '₦430,000',
-        created_at: '2026-10-18T08:00:00Z',
-      },
-    ],
-    sales: [
-      {
-        id: 'sale_1',
-        invoice_no: 'SP-1094',
-        customer_id: 'cust_1',
-        customer_name: 'Mama Nkechi Stores',
-        total_amount: 185000,
-        discount_amount: 0,
-        net_payable: 185000,
-        payment_channel: 'transfer',
-        amount_tendered: null,
-        change_returned: null,
-        created_at: '2026-10-21T09:15:00Z',
-      },
-      {
-        id: 'sale_2',
-        invoice_no: 'SP-1093',
-        customer_id: null,
-        customer_name: 'Walk-in Cash Customer',
-        total_amount: 142000,
-        discount_amount: 0,
-        net_payable: 142000,
-        payment_channel: 'cash',
-        amount_tendered: 150000,
-        change_returned: 8000,
-        created_at: '2026-10-21T10:30:00Z',
-      },
-      {
-        id: 'sale_3',
-        invoice_no: 'SP-1092',
-        customer_id: 'cust_2',
-        customer_name: 'Emeka Wholesales & Retail',
-        total_amount: 110000,
-        discount_amount: 0,
-        net_payable: 110000,
-        payment_channel: 'credit',
-        amount_tendered: null,
-        change_returned: null,
-        created_at: '2026-10-21T11:00:00Z',
-      },
-      {
-        id: 'sale_4',
-        invoice_no: 'SP-1091',
-        customer_id: null,
-        customer_name: 'Iya Basira Provisions',
-        total_amount: 49500,
-        discount_amount: 0,
-        net_payable: 49500,
-        payment_channel: 'pos',
-        amount_tendered: null,
-        change_returned: null,
-        created_at: '2026-10-21T11:45:00Z',
-      },
-    ],
-    saleItems: [
-      {
-        id: 'item_1',
-        sale_id: 'sale_1',
-        product_id: 'prod_3',
-        product_name: 'Peak Evaporated Milk 160g',
-        sku: 'PEAK-CAN-48',
-        quantity: 5,
-        unit_price: 28500,
-        total_price: 142500,
-      },
-      {
-        id: 'item_2',
-        sale_id: 'sale_1',
-        product_id: 'prod_4',
-        product_name: 'Gino Tomato Paste 70g',
-        sku: 'GINO-TOM-50',
-        quantity: 3,
-        unit_price: 13200,
-        total_price: 39600,
-      },
-      {
-        id: 'item_3',
-        sale_id: 'sale_2',
-        product_id: 'prod_1',
-        product_name: 'Dangote Refined Sugar 50kg',
-        sku: 'DNG-SUG-50',
-        quantity: 2,
-        unit_price: 71000,
-        total_price: 142000,
-      },
-      {
-        id: 'item_4',
-        sale_id: 'sale_3',
-        product_id: 'prod_5',
-        product_name: 'Indomie Super Pack (Carton 40)',
-        sku: 'IND-SUP-40',
-        quantity: 5,
-        unit_price: 18800,
-        total_price: 94000,
-      },
-    ],
+    customers: [],
+    sales: [],
+    saleItems: [],
     expenses: [
       {
         id: 'exp_1',
@@ -376,7 +221,7 @@ function getSeedData(): WebStoreData {
         cashier_name: 'Attendant Tunde',
         opened_at: new Date().toISOString(),
         closed_at: null,
-        expected_cash: 127000,
+        expected_cash: 0,
         counted_cash: null,
         discrepancy: null,
         notes: null,
@@ -417,15 +262,52 @@ class WebDatabaseImpl implements AppDatabase {
         const stored = storage.getItem(STORAGE_KEY);
         if (stored) {
           const parsed = JSON.parse(stored);
-          return {
+          const demoSaleIds = new Set(['sale_1', 'sale_2', 'sale_3', 'sale_4']);
+          const demoInvoices = new Set(['SP-1091', 'SP-1092', 'SP-1093', 'SP-1094']);
+          const cleanedSales = Array.isArray(parsed.sales)
+            ? parsed.sales.filter(
+                (s: any) => !demoSaleIds.has(s?.id) && !demoInvoices.has(s?.invoice_no)
+              )
+            : [];
+          const cleanedSaleItems = Array.isArray(parsed.saleItems)
+            ? parsed.saleItems.filter(
+                (i: any) =>
+                  !['item_1', 'item_2', 'item_3', 'item_4'].includes(i?.id) &&
+                  !demoSaleIds.has(i?.sale_id)
+              )
+            : [];
+          const cleanedShifts = Array.isArray(parsed.shifts)
+            ? parsed.shifts.map((s: any) =>
+                s?.id === 'shift_1' && s?.expected_cash === 127000
+                  ? { ...s, expected_cash: 0 }
+                  : s
+              )
+            : seed.shifts;
+
+          const cleanedData: WebStoreData = {
             products: Array.isArray(parsed.products) ? parsed.products : seed.products,
-            customers: Array.isArray(parsed.customers) ? parsed.customers : seed.customers,
-            sales: Array.isArray(parsed.sales) ? parsed.sales : seed.sales,
-            saleItems: Array.isArray(parsed.saleItems) ? parsed.saleItems : seed.saleItems,
+            customers: [],
+            sales: cleanedSales,
+            saleItems: cleanedSaleItems,
             expenses: Array.isArray(parsed.expenses) ? parsed.expenses : seed.expenses,
-            debtPayments: Array.isArray(parsed.debtPayments) ? parsed.debtPayments : seed.debtPayments,
-            shifts: Array.isArray(parsed.shifts) ? parsed.shifts : seed.shifts,
+            debtPayments: [],
+            shifts: cleanedShifts,
           };
+
+          if (
+            (Array.isArray(parsed.sales) && parsed.sales.length !== cleanedSales.length) ||
+            (Array.isArray(parsed.saleItems) && parsed.saleItems.length !== cleanedSaleItems.length) ||
+            (Array.isArray(parsed.customers) && parsed.customers.length > 0) ||
+            (Array.isArray(parsed.debtPayments) && parsed.debtPayments.length > 0)
+          ) {
+            try {
+              storage.setItem(STORAGE_KEY, JSON.stringify(cleanedData));
+            } catch (err) {
+              console.warn('Failed to sanitize localStorage web DB', err);
+            }
+          }
+
+          return cleanedData;
         }
       } catch (e) {
         console.warn('Failed to load localStorage web DB', e);
@@ -447,8 +329,21 @@ class WebDatabaseImpl implements AppDatabase {
 
   async execAsync(sql: string): Promise<void> {
     let changed = false;
-    if (sql.includes('DELETE FROM sale_items')) { this.data.saleItems = []; changed = true; }
-    if (sql.includes('DELETE FROM sales')) { this.data.sales = []; changed = true; }
+    if (sql.includes('sale_1') || sql.includes('SP-1091')) {
+      const demoSaleIds = new Set(['sale_1', 'sale_2', 'sale_3', 'sale_4']);
+      const demoInvoices = new Set(['SP-1091', 'SP-1092', 'SP-1093', 'SP-1094']);
+      this.data.sales = this.data.sales.filter(
+        (s) => !demoSaleIds.has(s.id) && !demoInvoices.has(s.invoice_no)
+      );
+      this.data.saleItems = this.data.saleItems.filter(
+        (i) =>
+          !['item_1', 'item_2', 'item_3', 'item_4'].includes(i.id) &&
+          !demoSaleIds.has(i.sale_id)
+      );
+      changed = true;
+    }
+    if (sql.includes('DELETE FROM sale_items') && !sql.includes('WHERE')) { this.data.saleItems = []; changed = true; }
+    if (sql.includes('DELETE FROM sales') && !sql.includes('WHERE')) { this.data.sales = []; changed = true; }
     if (sql.includes('DELETE FROM products')) { this.data.products = []; changed = true; }
     if (sql.includes('DELETE FROM customers')) { this.data.customers = []; changed = true; }
     if (sql.includes('DELETE FROM debt_payments')) { this.data.debtPayments = []; changed = true; }
@@ -729,8 +624,8 @@ class WebDatabaseImpl implements AppDatabase {
       return list as unknown as T[];
     }
 
-    // 4. Sales Summary for Dashboard
-    if (s.includes('FROM sales') && s.includes('SUM(net_payable) as totalSales')) {
+    // 4. Sales Summary for Dashboard & Reports
+    if (s.includes('FROM sales') && (s.includes('totalSales') || s.includes('grossSales'))) {
       const totalSales = this.data.sales.reduce((sum, sale) => sum + sale.net_payable, 0);
       const salesCount = this.data.sales.length;
       const cash = this.data.sales.filter((x) => x.payment_channel === 'cash').reduce((sum, x) => sum + x.net_payable, 0);
@@ -741,6 +636,7 @@ class WebDatabaseImpl implements AppDatabase {
       return [
         {
           totalSales,
+          grossSales: totalSales,
           salesCount,
           cash,
           transfer,

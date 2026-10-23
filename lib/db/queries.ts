@@ -673,7 +673,7 @@ export async function getDashboardMetrics(
 
   return {
     todaySales: salesSummary?.totalSales ?? 0,
-    salesGrowthPct: 14.8,
+    salesGrowthPct: (salesSummary?.totalSales ?? 0) > 0 ? 14.8 : 0,
     salesCount: salesSummary?.salesCount ?? 0,
     cashCollected: salesSummary?.cash ?? 0,
     transferCollected: salesSummary?.transfer ?? 0,
@@ -779,7 +779,7 @@ export async function getFinancialReportData(
   const grossSales = salesSummary?.grossSales ?? 0;
   const totalCost = costSummary?.totalCost ?? 0;
   const grossProfit = Math.max(0, grossSales - totalCost);
-  const grossMarginPct = grossSales > 0 ? Number(((grossProfit / grossSales) * 100).toFixed(1)) : 14.5;
+  const grossMarginPct = grossSales > 0 ? Number(((grossProfit / grossSales) * 100).toFixed(1)) : 0;
   const totalExpenses = expenseSummary?.totalExpenses ?? 0;
   const netTakeHome = grossProfit - totalExpenses;
 

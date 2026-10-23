@@ -221,12 +221,18 @@ export default function SalesRegisterScreen() {
           <View className="bg-surfaceContainerLow rounded-xl p-3.5 mb-3">
             <View className="flex-row items-center justify-between mb-1">
               <Text className="text-xs text-onSurfaceVariant">{"Today's Total Sales"}</Text>
-              <View className="flex-row items-center gap-0.5 px-2 py-0.5 rounded-full bg-secondaryContainer">
-                <AppIcon name="trending_up" size={12} color={colors.onSecondaryContainer} />
-                <Text className="text-[11px] font-bold text-onSecondaryContainer">
-                  +{metrics?.salesGrowthPct ?? 14.8}% vs Yest.
-                </Text>
-              </View>
+              {todayTotal > 0 ? (
+                <View className="flex-row items-center gap-0.5 px-2 py-0.5 rounded-full bg-secondaryContainer">
+                  <AppIcon name="trending_up" size={12} color={colors.onSecondaryContainer} />
+                  <Text className="text-[11px] font-bold text-onSecondaryContainer">
+                    +{metrics?.salesGrowthPct ?? 0}% vs Yest.
+                  </Text>
+                </View>
+              ) : (
+                <View className="px-2 py-0.5 rounded-full bg-surfaceContainer">
+                  <Text className="text-[10px] font-medium text-onSurfaceVariant">No sales today</Text>
+                </View>
+              )}
             </View>
             <Text className="text-3xl font-bold text-onSurface tracking-tight">
               ₦{todayTotal.toLocaleString()}<Text className="text-sm font-normal text-onSurfaceVariant">.00</Text>
