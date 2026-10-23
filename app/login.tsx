@@ -11,10 +11,11 @@ import { useRouter } from 'expo-router';
 import { AppIcon } from '@/components/icon';
 import { BrandLogo } from '@/components/brand-logo';
 import { colors } from '@/lib/theme';
-import { loginWithCredentials, loginWithDemo } from '@/lib/auth';
+import { loginWithCredentials, loginWithDemo, getStoredUser } from '@/lib/auth';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const currentUser = getStoredUser();
   const [authMode, setAuthMode] = useState<'phone' | 'email'>('phone');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -68,13 +69,46 @@ export default function LoginScreen() {
           <BrandLogo variant="emblem" size={26} />
           <Text className="text-base font-bold text-onSurface">StockPilot NG</Text>
         </View>
-        <View className="w-10" />
+        {currentUser ? (
+          <Pressable
+            onPress={() => router.replace('/(tabs)')}
+            className="px-2.5 py-1 rounded-full bg-secondaryContainer active:bg-secondaryContainer/80"
+          >
+            <Text className="text-[11px] font-bold text-onSecondaryContainer">Dashboard</Text>
+          </Pressable>
+        ) : (
+          <View className="w-10" />
+        )}
       </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
       >
+        {/* Already logged in session reminder */}
+        {currentUser && (
+          <View className="p-3 rounded-xl bg-secondaryContainer mb-4 flex-row items-center justify-between border border-cardBorder shadow-xs">
+            <View className="flex-row items-center gap-2 flex-1 mr-2">
+              <AppIcon name="check_circle" size={16} color={colors.secondary} />
+              <View className="flex-1 min-w-0">
+                <Text className="text-[10px] text-onSecondaryContainer font-bold uppercase tracking-wider">
+                  Active Login Session
+                </Text>
+                <Text className="text-xs text-onSurface font-bold truncate">
+                  {currentUser.businessName || currentUser.name}
+                </Text>
+              </View>
+            </View>
+            <Pressable
+              onPress={() => router.replace('/(tabs)')}
+              className="px-2.5 py-1 rounded-lg bg-primary active:bg-secondary flex-row items-center gap-1 shadow-xs"
+            >
+              <Text className="text-xs font-bold text-white">Dashboard</Text>
+              <AppIcon name="arrow_forward" size={13} color="#ffffff" />
+            </Pressable>
+          </View>
+        )}
+
         {/* Title & Badge */}
         <View className="mb-6">
           <BrandLogo variant="full" width={140} className="mb-4" />

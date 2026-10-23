@@ -6,12 +6,24 @@ import { useFonts } from 'expo-font';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { StockPilotDatabaseProvider } from '@/lib/db/provider';
 
+import { useEffect } from 'react';
+import * as SplashScreen from 'expo-splash-screen';
+
+// Prevent native splash from auto-hiding until initial font assets are loaded
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
 export const unstable_settings = { initialRouteName: 'index' };
 
 export default function RootLayout() {
-  useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     ...MaterialIcons.font,
   });
+
+  useEffect(() => {
+    if (fontsLoaded || fontError) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [fontsLoaded, fontError]);
 
   return (
     <StockPilotDatabaseProvider>

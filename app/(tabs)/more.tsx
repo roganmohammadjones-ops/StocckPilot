@@ -83,31 +83,14 @@ export default function MoreHubScreen() {
       ],
     },
     {
-      title: 'Stitch Flow & Experience',
+      title: 'Orders & Verification Flow',
       items: [
-        {
-          title: 'Launch & Splash Screen',
-          description: 'View the animated fintech offline initialization and node telemetry',
-          icon: 'bolt',
-          iconColor: colors.primary,
-          route: '/launch',
-          badge: 'Stitch Screen',
-        },
-        {
-          title: 'Welcome & Onboarding Tour',
-          description: 'Value proposition, live register snapshot & Lagos trade pillars',
-          icon: 'inventory',
-          iconColor: colors.secondary,
-          route: '/onboarding',
-          badge: 'Stitch Screen',
-        },
         {
           title: 'Wholesale Cart & Order Review',
           description: 'Dangote Sugar & Peak Milk bulk purchase review with depot pickup',
           icon: 'receipt_long',
           iconColor: colors.tertiary,
           route: '/order-review',
-          badge: 'Stitch Screen',
         },
         {
           title: 'Phone OTP Verification',
@@ -115,7 +98,6 @@ export default function MoreHubScreen() {
           icon: 'chat',
           iconColor: colors.primary,
           route: '/otp-verify',
-          badge: 'Stitch Screen',
         },
       ],
     },

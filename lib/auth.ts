@@ -1,3 +1,5 @@
+import 'expo-sqlite/localStorage/install';
+import { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 
 export interface UserProfile {
@@ -36,20 +38,31 @@ export const DEMO_BUYER: UserProfile = {
 };
 
 let inMemoryUserSession: UserProfile | null = null;
+const authListeners = new Set<() => void>();
 
 function getSafeLocalStorage(): Storage | null {
   try {
-    if (typeof window === 'undefined') return null;
-    if (!('localStorage' in window)) return null;
-    const storage = window.localStorage;
-    if (!storage) return null;
-    const testKey = '__stockpilot_test__';
-    storage.setItem(testKey, '1');
-    storage.removeItem(testKey);
-    return storage;
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return window.localStorage;
+    }
+    if (typeof localStorage !== 'undefined') {
+      return localStorage;
+    }
+    return null;
   } catch {
     return null;
   }
+}
+
+export function subscribeAuth(callback: () => void): () => void {
+  authListeners.add(callback);
+  return () => {
+    authListeners.delete(callback);
+  };
+}
+
+export function isLoggedIn(): boolean {
+  return getStoredUser() !== null;
 }
 
 export function getStoredUser(): UserProfile | null {
@@ -84,6 +97,27 @@ export function saveStoredUser(user: UserProfile | null): void {
   } catch (e) {
     console.warn('Failed to save auth session to storage', e);
   }
+
+  authListeners.forEach((listener) => {
+    try {
+      listener();
+    } catch {}
+  });
+}
+
+export function useAuth(): { user: UserProfile | null; isLoggedIn: boolean } {
+  const [user, setUser] = useState<UserProfile | null>(() => getStoredUser());
+
+  useEffect(() => {
+    return subscribeAuth(() => {
+      setUser(getStoredUser());
+    });
+  }, []);
+
+  return {
+    user,
+    isLoggedIn: user !== null,
+  };
 }
 
 export async function loginWithDemo(role: 'merchant' | 'buyer' = 'merchant'): Promise<UserProfile> {

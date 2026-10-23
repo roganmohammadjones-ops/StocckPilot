@@ -11,18 +11,9 @@ import { AppIcon } from '@/components/icon';
 import { BrandLogo } from '@/components/brand-logo';
 import { colors } from '@/lib/theme';
 import { signupMerchant } from '@/lib/auth';
-import { resetStoreProfileToStandard } from '@/lib/store-profile';
+import { resetStoreProfileToStandard, TRADING_HUBS } from '@/lib/store-profile';
 
-const tradingHubs = [
-  'Idumota Wholesale Hub, Lagos',
-  'Alaba International Market, Lagos',
-  'Balogun Market, Lagos Island',
-  'Trade Fair Complex (ASPAAM), Lagos',
-  'Dawanau Grain Market, Kano',
-  'Onitsha Main Market, Anambra',
-  'Mile 12 Food Market, Lagos',
-  'Bodija Market, Ibadan',
-];
+const tradingHubs = TRADING_HUBS;
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -30,30 +21,44 @@ export default function SignupScreen() {
   const [ownerName, setOwnerName] = useState('');
   const [phone, setPhone] = useState('');
   const [selectedHub, setSelectedHub] = useState(tradingHubs[0]);
+  const [isManualHub, setIsManualHub] = useState(false);
+  const [customHub, setCustomHub] = useState('');
   const [showHubPicker, setShowHubPicker] = useState(false);
+  const [hubSearchQuery, setHubSearchQuery] = useState('');
+
+  const filteredHubs = tradingHubs.filter((hub) =>
+    hub.toLowerCase().includes(hubSearchQuery.trim().toLowerCase())
+  );
 
   const handleProceedToOtp = async () => {
     const finalBusiness = businessName.trim() || 'My Wholesale Depot';
     const finalOwner = ownerName.trim() || 'Store Manager';
     const finalPhone = phone.trim() ? `+234 ${phone.trim()}` : '+234 800 000 0000';
+    const activeHub = isManualHub ? customHub.trim() : selectedHub;
+    const finalHub = activeHub || selectedHub || 'Idumota Wholesale Hub, Lagos';
 
     await signupMerchant({
       businessName: finalBusiness,
       ownerName: finalOwner,
       phone: finalPhone,
-      tradeHub: selectedHub,
+      tradeHub: finalHub,
     });
 
     resetStoreProfileToStandard({
       businessName: finalBusiness,
       ownerName: finalOwner,
       phone: finalPhone,
-      marketLocation: selectedHub,
+      marketLocation: finalHub,
     });
 
     router.push({
       pathname: '/otp-verify',
-      params: { phone: finalPhone, businessName: finalBusiness, source: 'signup' },
+      params: {
+        phone: finalPhone,
+        businessName: finalBusiness,
+        tradeHub: finalHub,
+        source: 'signup',
+      },
     });
   };
 
@@ -150,39 +155,204 @@ export default function SignupScreen() {
             </View>
           </View>
 
-          {/* Market Trading Hub Picker */}
+          {/* Market Trading Hub Section */}
           <View>
-            <Text className="text-xs font-bold text-onSurface mb-1.5">Primary Trading Market / Hub</Text>
-            <Pressable
-              onPress={() => setShowHubPicker(!showHubPicker)}
-              className="bg-white border border-cardBorder rounded-xl px-3 h-12 flex-row items-center justify-between active:bg-surfaceContainer"
-            >
-              <View className="flex-row items-center gap-2 flex-1 min-w-0 mr-2">
-                <AppIcon name="location_on" size={18} color={colors.primary} />
-                <Text className="text-sm text-onSurface font-medium truncate">{selectedHub}</Text>
-              </View>
-              <AppIcon name="arrow_drop_down" size={20} color={colors.outline} />
-            </Pressable>
+            <View className="flex-row items-center justify-between mb-1.5">
+              <Text className="text-xs font-bold text-onSurface">Primary Trading Market / Hub</Text>
+              <Pressable
+                onPress={() => {
+                  setIsManualHub(!isManualHub);
+                  setShowHubPicker(false);
+                }}
+                className="flex-row items-center gap-1 px-2.5 py-1 rounded-full bg-secondaryContainer/60 active:bg-secondaryContainer"
+              >
+                <AppIcon name={isManualHub ? 'list' : 'edit'} size={12} color={colors.secondary} />
+                <Text className="text-[11px] font-bold text-onSecondaryContainer">
+                  {isManualHub ? 'Choose from list' : 'Input manually'}
+                </Text>
+              </Pressable>
+            </View>
 
-            {showHubPicker && (
-              <View className="bg-white border border-cardBorder rounded-xl mt-1.5 shadow-lg overflow-hidden divide-y divide-cardBorder">
-                {tradingHubs.map((hub) => (
+            {isManualHub ? (
+              <View>
+                <View className="bg-white border-2 border-primary/70 rounded-xl px-3 h-12 flex-row items-center focus:border-primary shadow-sm">
+                  <AppIcon name="edit_location" size={18} color={colors.primary} />
+                  <TextInput
+                    value={customHub}
+                    onChangeText={setCustomHub}
+                    placeholder="e.g. Ariaria Market Aba, Singer Market Kano..."
+                    placeholderTextColor={colors.outline}
+                    className="flex-1 text-sm text-onSurface font-medium outline-none ml-2"
+                    autoFocus
+                  />
+                  {customHub.length > 0 && (
+                    <Pressable onPress={() => setCustomHub('')} className="p-1">
+                      <AppIcon name="close" size={16} color={colors.outline} />
+                    </Pressable>
+                  )}
+                </View>
+
+                <View className="flex-row items-center justify-between mt-1.5 px-0.5">
+                  <Text className="text-[11px] text-onSurfaceVariant">
+                    Manual entry active • Custom market will be saved
+                  </Text>
                   <Pressable
-                    key={hub}
-                    onPress={() => {
-                      setSelectedHub(hub);
-                      setShowHubPicker(false);
-                    }}
-                    className={`p-3 flex-row items-center justify-between ${
-                      selectedHub === hub ? 'bg-secondaryContainer/40' : 'active:bg-surfaceContainer'
-                    }`}
+                    onPress={() => setIsManualHub(false)}
+                    className="active:opacity-70"
                   >
-                    <Text className="text-xs font-semibold text-onSurface">{hub}</Text>
-                    {selectedHub === hub && (
-                      <AppIcon name="check_circle" size={16} color={colors.primary} />
-                    )}
+                    <Text className="text-[11px] font-bold text-primary underline">
+                      Switch to presets
+                    </Text>
                   </Pressable>
-                ))}
+                </View>
+
+                {/* Popular Quick Suggestions */}
+                <View className="mt-2.5 flex-row flex-wrap items-center gap-1.5">
+                  <Text className="text-[10px] font-semibold text-onSurfaceVariant mr-0.5">
+                    Quick Picks:
+                  </Text>
+                  {['Idumota', 'Alaba', 'Balogun', 'Onitsha', 'Dawanau', 'Ariaria', 'Wuse'].map(
+                    (hubName) => (
+                      <Pressable
+                        key={hubName}
+                        onPress={() => {
+                          const match = tradingHubs.find((h) =>
+                            h.toLowerCase().includes(hubName.toLowerCase())
+                          );
+                          if (match) {
+                            setSelectedHub(match);
+                            setIsManualHub(false);
+                          } else {
+                            setCustomHub(`${hubName} Market`);
+                          }
+                        }}
+                        className="px-2 py-0.5 rounded-full bg-surfaceContainer border border-cardBorder active:bg-secondaryContainer"
+                      >
+                        <Text className="text-[10px] font-medium text-onSurface">{hubName}</Text>
+                      </Pressable>
+                    )
+                  )}
+                </View>
+              </View>
+            ) : (
+              <View>
+                <Pressable
+                  onPress={() => setShowHubPicker(!showHubPicker)}
+                  className="bg-white border border-cardBorder rounded-xl px-3 h-12 flex-row items-center justify-between active:bg-surfaceContainer"
+                >
+                  <View className="flex-row items-center gap-2 flex-1 min-w-0 mr-2">
+                    <AppIcon name="location_on" size={18} color={colors.primary} />
+                    <Text className="text-sm text-onSurface font-medium truncate">{selectedHub}</Text>
+                  </View>
+                  <AppIcon
+                    name={showHubPicker ? 'arrow_drop_up' : 'arrow_drop_down'}
+                    size={20}
+                    color={colors.outline}
+                  />
+                </Pressable>
+
+                {showHubPicker && (
+                  <View className="bg-white border border-cardBorder rounded-xl mt-1.5 shadow-lg overflow-hidden">
+                    {/* Search / Filter in dropdown */}
+                    <View className="p-2.5 border-b border-cardBorder bg-surfaceContainerLow flex-row items-center gap-2">
+                      <AppIcon name="search" size={16} color={colors.outline} />
+                      <TextInput
+                        value={hubSearchQuery}
+                        onChangeText={setHubSearchQuery}
+                        placeholder="Search markets or type custom name..."
+                        placeholderTextColor={colors.outline}
+                        className="flex-1 text-xs text-onSurface outline-none h-7"
+                      />
+                      {hubSearchQuery.length > 0 && (
+                        <Pressable onPress={() => setHubSearchQuery('')} className="p-0.5">
+                          <AppIcon name="close" size={14} color={colors.outline} />
+                        </Pressable>
+                      )}
+                    </View>
+
+                    {/* Direct action to use typed search query as custom market */}
+                    {hubSearchQuery.trim().length > 0 && (
+                      <Pressable
+                        onPress={() => {
+                          setCustomHub(hubSearchQuery.trim());
+                          setIsManualHub(true);
+                          setShowHubPicker(false);
+                          setHubSearchQuery('');
+                        }}
+                        className="p-3 bg-secondaryContainer/50 flex-row items-center gap-2 border-b border-cardBorder active:bg-secondaryContainer"
+                      >
+                        <AppIcon name="add_location" size={16} color={colors.secondary} />
+                        <View className="flex-1">
+                          <Text className="text-xs font-bold text-onSecondaryContainer">
+                            {`Use "${hubSearchQuery.trim()}" as custom market`}
+                          </Text>
+                          <Text className="text-[10px] text-onSecondaryContainer/80">
+                            Tap to save as custom trading hub
+                          </Text>
+                        </View>
+                        <Text className="text-[10px] font-bold text-secondary uppercase bg-white px-1.5 py-0.5 rounded shadow-sm">
+                          Custom
+                        </Text>
+                      </Pressable>
+                    )}
+
+                    <ScrollView
+                      style={{ maxHeight: 200 }}
+                      nestedScrollEnabled
+                      showsVerticalScrollIndicator
+                    >
+                      {filteredHubs.map((hub) => (
+                        <Pressable
+                          key={hub}
+                          onPress={() => {
+                            setSelectedHub(hub);
+                            setShowHubPicker(false);
+                            setHubSearchQuery('');
+                          }}
+                          className={`p-3 flex-row items-center justify-between border-b border-cardBorder/40 ${
+                            selectedHub === hub
+                              ? 'bg-secondaryContainer/40'
+                              : 'active:bg-surfaceContainer'
+                          }`}
+                        >
+                          <Text className="text-xs font-semibold text-onSurface">{hub}</Text>
+                          {selectedHub === hub && (
+                            <AppIcon name="check_circle" size={16} color={colors.primary} />
+                          )}
+                        </Pressable>
+                      ))}
+
+                      {filteredHubs.length === 0 && (
+                        <View className="p-4 items-center justify-center">
+                          <Text className="text-xs text-onSurfaceVariant">
+                            No matching preset market found
+                          </Text>
+                        </View>
+                      )}
+                    </ScrollView>
+
+                    {/* Bottom option: Input Market Hub Manually */}
+                    <Pressable
+                      onPress={() => {
+                        if (hubSearchQuery.trim().length > 0) {
+                          setCustomHub(hubSearchQuery.trim());
+                        }
+                        setIsManualHub(true);
+                        setShowHubPicker(false);
+                        setHubSearchQuery('');
+                      }}
+                      className="p-3 flex-row items-center justify-between bg-surfaceContainerLow border-t border-cardBorder active:bg-surfaceContainer"
+                    >
+                      <View className="flex-row items-center gap-2">
+                        <AppIcon name="edit" size={16} color={colors.primary} />
+                        <Text className="text-xs font-bold text-primary">
+                          {"Can't find your market? Input manually"}
+                        </Text>
+                      </View>
+                      <AppIcon name="chevron_right" size={16} color={colors.primary} />
+                    </Pressable>
+                  </View>
+                )}
               </View>
             )}
           </View>

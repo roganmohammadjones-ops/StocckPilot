@@ -48,6 +48,21 @@ export const NIGERIAN_BANKS = [
   'Jaiz Bank',
 ];
 
+export const TRADING_HUBS = [
+  'Idumota Wholesale Hub, Lagos',
+  'Alaba International Market, Lagos',
+  'Balogun Market, Lagos Island',
+  'Trade Fair Complex (ASPAAM), Lagos',
+  'Dawanau Grain Market, Kano',
+  'Onitsha Main Market, Anambra',
+  'Mile 12 Food Market, Lagos',
+  'Bodija Market, Ibadan',
+  'Ariaria International Market, Aba',
+  'Wuse Market, Abuja',
+  'Main Market, Jos',
+  'Ogbete Main Market, Enugu',
+];
+
 const STORE_PROFILE_STORAGE_KEY = 'stockpilot_store_profile_v1';
 
 let cachedProfile: StoreProfile | null = null;
@@ -55,11 +70,9 @@ const listeners = new Set<() => void>();
 
 function getSafeLocalStorage(): Storage | null {
   try {
-    if (typeof window === 'undefined') return null;
-    if (!('localStorage' in window)) return null;
-    const storage = window.localStorage;
-    if (!storage) return null;
-    return storage;
+    if (typeof window !== 'undefined' && window.localStorage) return window.localStorage;
+    if (typeof localStorage !== 'undefined') return localStorage;
+    return null;
   } catch {
     return null;
   }

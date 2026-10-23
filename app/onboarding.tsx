@@ -1,18 +1,28 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
   ScrollView,
   Pressable,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { AppIcon } from '@/components/icon';
 import { BrandLogo } from '@/components/brand-logo';
 import { colors } from '@/lib/theme';
-import { loginWithDemo } from '@/lib/auth';
+import { loginWithDemo, getStoredUser } from '@/lib/auth';
 
 export default function WelcomeOnboardingScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ preview?: string }>();
+  const user = getStoredUser();
+  const loggedIn = !!user;
+
+  // When someone is logged in already, skip onboarding and go directly to dashboard (unless explicit preview)
+  useEffect(() => {
+    if (loggedIn && params.preview !== 'true') {
+      router.replace('/(tabs)');
+    }
+  }, [loggedIn, params.preview, router]);
 
   const handleLaunchDemo = async (role: 'merchant' | 'buyer') => {
     await loginWithDemo(role);
@@ -22,6 +32,10 @@ export default function WelcomeOnboardingScreen() {
       router.replace('/explore-sellers');
     }
   };
+
+  if (loggedIn && params.preview !== 'true') {
+    return <View className="flex-1 bg-surface" />;
+  }
 
   return (
     <View className="flex-1 bg-surface">
@@ -35,20 +49,54 @@ export default function WelcomeOnboardingScreen() {
           </View>
         </View>
 
-        <Pressable
-          onPress={() => router.push('/login')}
-          className="px-4 py-1.5 rounded-full bg-surfaceContainer active:bg-surfaceContainerHigh"
-        >
-          <Text className="text-sm font-semibold text-onSurface">Log In</Text>
-        </Pressable>
+        {loggedIn ? (
+          <Pressable
+            onPress={() => router.replace('/(tabs)')}
+            className="flex-row items-center gap-1 px-3.5 py-1.5 rounded-full bg-primary active:bg-secondary shadow-xs"
+          >
+            <Text className="text-xs font-bold text-white">Dashboard</Text>
+            <AppIcon name="arrow_forward" size={14} color="#ffffff" />
+          </Pressable>
+        ) : (
+          <Pressable
+            onPress={() => router.push('/login')}
+            className="px-4 py-1.5 rounded-full bg-surfaceContainer active:bg-surfaceContainerHigh"
+          >
+            <Text className="text-sm font-semibold text-onSurface">Log In</Text>
+          </Pressable>
+        )}
       </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 110 }}
       >
+        {/* Active Session Notice when viewing preview */}
+        {loggedIn && user && (
+          <View className="mx-4 mt-4 p-3 rounded-xl bg-secondaryContainer border border-cardBorder flex-row items-center justify-between shadow-xs">
+            <View className="flex-row items-center gap-2 flex-1 mr-2">
+              <AppIcon name="account_circle" size={20} color={colors.secondary} />
+              <View className="flex-1 min-w-0">
+                <Text className="text-[11px] text-onSecondaryContainer font-bold uppercase tracking-wider">
+                  Already Signed In
+                </Text>
+                <Text className="text-xs font-bold text-onSurface truncate">
+                  {user.businessName || user.name}
+                </Text>
+              </View>
+            </View>
+            <Pressable
+              onPress={() => router.replace('/(tabs)')}
+              className="px-3 py-1.5 rounded-lg bg-primary active:bg-secondary flex-row items-center gap-1 shadow-xs"
+            >
+              <Text className="text-xs font-bold text-white">Go to Dashboard</Text>
+              <AppIcon name="arrow_forward" size={13} color="#ffffff" />
+            </Pressable>
+          </View>
+        )}
+
         {/* Hero & Value Statement */}
-        <View className="px-4 pt-5 pb-3">
+        <View className="px-4 pt-4 pb-3">
           {/* Offline & Reliability Pill */}
           <View className="self-start flex-row items-center gap-1.5 px-3 py-1 rounded-full bg-secondaryContainer mb-3">
             <View className="w-2 h-2 rounded-full bg-primary" />
@@ -311,35 +359,71 @@ export default function WelcomeOnboardingScreen() {
 
       {/* Sticky Bottom CTA Dock */}
       <View className="absolute bottom-0 inset-x-0 bg-white/95 border-t border-cardBorder px-4 py-3 pb-6 shadow-xl">
-        <Pressable
-          onPress={() => router.push('/signup')}
-          className="w-full h-12 rounded-xl bg-primary items-center justify-center flex-row gap-2 active:bg-secondary shadow-md mb-2"
-        >
-          <Text className="text-white font-bold text-sm">Create Free Business Account</Text>
-          <AppIcon name="arrow_forward" size={18} color="#ffffff" />
-        </Pressable>
+        {loggedIn ? (
+          <>
+            <Pressable
+              onPress={() => router.replace('/(tabs)')}
+              className="w-full h-12 rounded-xl bg-primary items-center justify-center flex-row gap-2 active:bg-secondary shadow-md mb-2"
+            >
+              <Text className="text-white font-bold text-sm">Go Directly to Dashboard</Text>
+              <AppIcon name="arrow_forward" size={18} color="#ffffff" />
+            </Pressable>
 
-        <View className="flex-row gap-2">
-          <Pressable
-            onPress={() => handleLaunchDemo('merchant')}
-            className="flex-1 h-10 rounded-xl bg-surfaceContainer items-center justify-center flex-row gap-1 active:bg-surfaceContainerHigh"
-          >
-            <AppIcon name="warehouse" size={16} color={colors.primary} />
-            <Text className="text-xs font-bold text-onSurface">Merchant Demo</Text>
-          </Pressable>
+            <View className="flex-row gap-2">
+              <Pressable
+                onPress={() => router.push('/explore-sellers')}
+                className="flex-1 h-10 rounded-xl bg-surfaceContainer items-center justify-center flex-row gap-1 active:bg-surfaceContainerHigh"
+              >
+                <AppIcon name="storefront" size={16} color={colors.primary} />
+                <Text className="text-xs font-bold text-onSurface">Market Sellers</Text>
+              </Pressable>
 
-          <Pressable
-            onPress={() => handleLaunchDemo('buyer')}
-            className="flex-1 h-10 rounded-xl bg-surfaceContainer items-center justify-center flex-row gap-1 active:bg-surfaceContainerHigh"
-          >
-            <AppIcon name="shopping_bag" size={16} color={colors.tertiary} />
-            <Text className="text-xs font-bold text-onSurface">Buyer Stalls Demo</Text>
-          </Pressable>
-        </View>
+              <Pressable
+                onPress={() => router.push('/login')}
+                className="flex-1 h-10 rounded-xl bg-surfaceContainer items-center justify-center flex-row gap-1 active:bg-surfaceContainerHigh"
+              >
+                <AppIcon name="switch_account" size={16} color={colors.tertiary} />
+                <Text className="text-xs font-bold text-onSurface">Switch Account</Text>
+              </Pressable>
+            </View>
 
-        <Text className="text-[11px] text-center text-onSurfaceVariant mt-2">
-          Takes only 60 seconds • No card required • Free 30-day trial
-        </Text>
+            <Text className="text-[11px] text-center text-onSurfaceVariant mt-2">
+              You are signed in • Tap above to return to your workspace
+            </Text>
+          </>
+        ) : (
+          <>
+            <Pressable
+              onPress={() => router.push('/signup')}
+              className="w-full h-12 rounded-xl bg-primary items-center justify-center flex-row gap-2 active:bg-secondary shadow-md mb-2"
+            >
+              <Text className="text-white font-bold text-sm">Create Free Business Account</Text>
+              <AppIcon name="arrow_forward" size={18} color="#ffffff" />
+            </Pressable>
+
+            <View className="flex-row gap-2">
+              <Pressable
+                onPress={() => handleLaunchDemo('merchant')}
+                className="flex-1 h-10 rounded-xl bg-surfaceContainer items-center justify-center flex-row gap-1 active:bg-surfaceContainerHigh"
+              >
+                <AppIcon name="warehouse" size={16} color={colors.primary} />
+                <Text className="text-xs font-bold text-onSurface">Merchant Demo</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => handleLaunchDemo('buyer')}
+                className="flex-1 h-10 rounded-xl bg-surfaceContainer items-center justify-center flex-row gap-1 active:bg-surfaceContainerHigh"
+              >
+                <AppIcon name="shopping_bag" size={16} color={colors.tertiary} />
+                <Text className="text-xs font-bold text-onSurface">Buyer Stalls Demo</Text>
+              </Pressable>
+            </View>
+
+            <Text className="text-[11px] text-center text-onSurfaceVariant mt-2">
+              Takes only 60 seconds • No card required • Free 30-day trial
+            </Text>
+          </>
+        )}
       </View>
     </View>
   );

@@ -25,6 +25,7 @@ import {
   removeSettlementAccount,
   setDefaultSettlementAccount,
   NIGERIAN_BANKS,
+  TRADING_HUBS,
 } from '@/lib/store-profile';
 import { clearAllDatabaseRecords, seedStandardSampleCatalog } from '@/lib/db/queries';
 
@@ -632,7 +633,10 @@ export default function SettingsScreen() {
               </View>
 
               <View>
-                <Text className="text-xs font-bold text-onSurface mb-1">Market Location / Hub</Text>
+                <View className="flex-row items-center justify-between mb-1">
+                  <Text className="text-xs font-bold text-onSurface">Market Location / Hub</Text>
+                  <Text className="text-[10px] text-onSurfaceVariant">Type manually or tap preset</Text>
+                </View>
                 <TextInput
                   value={editLocation}
                   onChangeText={setEditLocation}
@@ -640,6 +644,30 @@ export default function SettingsScreen() {
                   placeholderTextColor={colors.outline}
                   className="bg-surfaceContainerLow border border-cardBorder rounded-xl px-3 h-11 text-xs text-onSurface"
                 />
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-1.5 flex-row gap-1.5 py-1">
+                  {TRADING_HUBS.map((hub) => {
+                    const isSelected = editLocation === hub;
+                    return (
+                      <Pressable
+                        key={hub}
+                        onPress={() => setEditLocation(hub)}
+                        className={`px-2.5 py-1 rounded-full border ${
+                          isSelected
+                            ? 'bg-primary border-primary'
+                            : 'bg-surfaceContainer border-cardBorder active:bg-secondaryContainer'
+                        }`}
+                      >
+                        <Text
+                          className={`text-[10px] font-medium ${
+                            isSelected ? 'text-white font-bold' : 'text-onSurfaceVariant'
+                          }`}
+                        >
+                          {hub}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
               </View>
 
               <View>

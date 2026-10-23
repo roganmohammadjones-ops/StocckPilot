@@ -14,6 +14,7 @@ import { AppIcon } from '@/components/icon';
 import { BrandLogo } from '@/components/brand-logo';
 import { colors } from '@/lib/theme';
 import { getStoredUser, saveStoredUser, UserProfile } from '@/lib/auth';
+import { getStoreProfile } from '@/lib/store-profile';
 import {
   parseNigerianPhone,
   dispatchOtp,
@@ -31,6 +32,7 @@ export default function OtpVerifyScreen() {
   const params = useLocalSearchParams<{
     phone?: string;
     businessName?: string;
+    tradeHub?: string;
     source?: string;
     initialChannel?: string;
   }>();
@@ -251,12 +253,13 @@ export default function OtpVerifyScreen() {
 
       // Successful verification: save or update stored merchant session
       const existing = getStoredUser();
+      const profile = getStoreProfile();
       const updatedUser: UserProfile = {
         id: existing?.id || `usr_${Date.now()}`,
-        name: existing?.name || (params.businessName ? `${params.businessName} Admin` : 'Alhaji Musa Sani'),
+        name: existing?.name || (params.businessName ? `${params.businessName} Admin` : profile.ownerName || 'Store Manager'),
         phone: parsedPhone.displayPhone,
-        businessName: existing?.businessName || params.businessName || 'Musa & Sons Provisions Ltd',
-        tradeHub: existing?.tradeHub || 'Idumota Wholesale Hub, Lagos',
+        businessName: existing?.businessName || params.businessName || profile.businessName || 'My Wholesale Depot',
+        tradeHub: params.tradeHub || existing?.tradeHub || profile.marketLocation || 'Idumota Wholesale Hub, Lagos',
         role: existing?.role || 'merchant',
         isDemo: false,
       };

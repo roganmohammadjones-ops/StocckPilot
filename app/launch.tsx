@@ -7,6 +7,7 @@ import {
 import { useRouter } from 'expo-router';
 import { AppIcon } from '@/components/icon';
 import { BrandLogo } from '@/components/brand-logo';
+import { getStoredUser } from '@/lib/auth';
 
 interface Step {
   pct: number;
@@ -28,12 +29,18 @@ export default function LaunchSplashScreen() {
   const [currentStepIdx, setCurrentStepIdx] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
   const hasNavigatedRef = useRef(false);
+  const user = getStoredUser();
+  const isLoggedIn = !!user;
 
-  const navigateToOnboarding = useCallback(() => {
+  const navigateToDestination = useCallback(() => {
     if (hasNavigatedRef.current) return;
     hasNavigatedRef.current = true;
-    router.replace('/onboarding');
-  }, [router]);
+    if (isLoggedIn) {
+      router.replace('/(tabs)');
+    } else {
+      router.replace('/onboarding');
+    }
+  }, [router, isLoggedIn]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -51,19 +58,19 @@ export default function LaunchSplashScreen() {
     return () => clearInterval(timer);
   }, []);
 
-  // When splash initialization completes, immediately follow with onboarding before anything else
+  // When splash initialization completes, proceed to dashboard if logged in, or onboarding if new
   useEffect(() => {
     if (!isComplete) return;
 
     const navTimer = setTimeout(() => {
-      navigateToOnboarding();
+      navigateToDestination();
     }, 350);
 
     return () => clearTimeout(navTimer);
-  }, [isComplete, navigateToOnboarding]);
+  }, [isComplete, navigateToDestination]);
 
   const handleProceed = () => {
-    navigateToOnboarding();
+    navigateToDestination();
   };
 
   const currentStep = steps[currentStepIdx];
@@ -80,11 +87,24 @@ export default function LaunchSplashScreen() {
           </Text>
         </View>
 
-        {/* Security / Encryption Indicator */}
-        <View className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#032317] border border-[#166534]">
-          <AppIcon name="lock" size={14} color="#a6f4b5" />
-          <Text className="text-[11px] font-bold text-[#a6f4b5]">AES-256</Text>
-        </View>
+        {/* Security / Dashboard Indicator */}
+        {isLoggedIn ? (
+          <Pressable
+            onPress={() => {
+              hasNavigatedRef.current = true;
+              router.replace('/(tabs)');
+            }}
+            className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#053322] border border-[#166534] active:bg-[#166534]"
+          >
+            <Text className="text-[11px] font-bold text-[#8bd79b]">Open Dashboard</Text>
+            <AppIcon name="arrow_forward" size={13} color="#8bd79b" />
+          </Pressable>
+        ) : (
+          <View className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#032317] border border-[#166534]">
+            <AppIcon name="lock" size={14} color="#a6f4b5" />
+            <Text className="text-[11px] font-bold text-[#a6f4b5]">AES-256</Text>
+          </View>
+        )}
       </View>
 
       {/* Center Stage: Brand Iconography, Wordmark & Tagline */}
@@ -178,7 +198,9 @@ export default function LaunchSplashScreen() {
           className="w-full h-12 rounded-xl bg-[#16a34a] items-center justify-center flex-row gap-2 active:bg-[#15803d] shadow-lg"
         >
           <Text className="text-white font-bold text-sm">
-            {isComplete ? 'Continue to Onboarding' : 'Skip to Onboarding'}
+            {isLoggedIn
+              ? (isComplete ? 'Continue to Dashboard' : 'Skip to Dashboard')
+              : (isComplete ? 'Continue to Onboarding' : 'Skip to Onboarding')}
           </Text>
           <AppIcon name="arrow_forward" size={18} color="#ffffff" />
         </Pressable>

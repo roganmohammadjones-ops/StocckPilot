@@ -252,7 +252,7 @@ async function dispatchViaTermii(
   businessName?: string
 ): Promise<{ success: boolean; pinId?: string; error?: string }> {
   const customSender = process.env.EXPO_PUBLIC_TERMII_SENDER_ID;
-  const senderId = customSender || 'N-Alert';
+  const senderId = customSender || 'StockPilot';
   const shopRef = businessName ? businessName.trim() : 'StockPilot';
 
   let termiiOtpError = '';
@@ -261,13 +261,16 @@ async function dispatchViaTermii(
   try {
     const otpRes = await fetch('https://api.ng.termii.com/api/sms/otp/send', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
       body: JSON.stringify({
         api_key: apiKey,
         message_type: 'NUMERIC',
         to: whatsappPhone, // e.g. 2348034918820
         from: senderId,
-        channel: channel === 'whatsapp' ? 'whatsapp' : 'generic',
+        channel: channel === 'whatsapp' ? 'whatsapp_otp' : 'generic',
         pin_attempts: 5,
         pin_time_to_live: 10,
         pin_length: 6,
@@ -297,13 +300,16 @@ async function dispatchViaTermii(
   try {
     const directRes = await fetch('https://api.ng.termii.com/api/sms/send', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
       body: JSON.stringify({
         to: whatsappPhone,
-        from: 'N-Alert', // Always safe pre-approved sender ID on Termii
+        from: senderId,
         sms: `StockPilot NG: Your 6-digit verification code is ${code} for ${shopRef}. Valid for 10 minutes. Do not share.`,
         type: 'plain',
-        channel: channel === 'whatsapp' ? 'whatsapp' : 'generic',
+        channel: channel === 'whatsapp' ? 'whatsapp_otp' : 'generic',
         api_key: apiKey,
       }),
     });
@@ -314,17 +320,42 @@ async function dispatchViaTermii(
       if (directData.message === 'Successfully Sent' || directData.code === 'ok' || directData.message_id) {
         return { success: true };
       }
-      return { success: false, error: directData.message || termiiOtpError || 'Termii delivery failed' };
-    }
-
-    if (directData && directData.message) {
-      return { success: false, error: directData.message };
+      if (directData.message) {
+        termiiOtpError = directData.message;
+      }
+    } else if (directData && directData.message) {
+      termiiOtpError = directData.message;
     }
   } catch (err: any) {
-    return { success: false, error: err?.message || termiiOtpError || 'Network error connecting to Termii API' };
+    termiiOtpError = err?.message || termiiOtpError;
   }
 
-  return { success: false, error: termiiOtpError || 'Could not deliver code via Termii gateway. Please verify your API key and balance.' };
+  // 3. User-friendly formatting for known Termii account onboarding states
+  if (termiiOtpError.includes('SENDER_ID_NOT_APPROVED') || termiiOtpError.includes('sender ID')) {
+    return {
+      success: false,
+      error: `Termii Gateway: Sender ID is awaiting approval on your Termii dashboard. Live delivery will start once approved. (You can use test code 123456 to verify in the meantime).`,
+    };
+  }
+
+  if (termiiOtpError.includes('Country Inactive')) {
+    return {
+      success: false,
+      error: `Termii Gateway: Route activation needed on your Termii dashboard. (You can use test code 123456 to verify in the meantime).`,
+    };
+  }
+
+  if (termiiOtpError.includes('balance') || termiiOtpError.includes('Credit')) {
+    return {
+      success: false,
+      error: `Termii Gateway: Low wallet balance on Termii dashboard. Please top up your wallet or use test code 123456.`,
+    };
+  }
+
+  return {
+    success: false,
+    error: termiiOtpError || 'Could not deliver code via Termii gateway. Check Termii dashboard or use test code 123456.',
+  };
 }
 
 /**
