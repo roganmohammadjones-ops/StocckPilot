@@ -48,6 +48,8 @@ export function useAppDb(): AppDatabase {
   return useSQLiteContext() as unknown as AppDatabase;
 }
 
+export const useDatabase = useAppDb;
+
 export function useDataRefresh() {
   return useContext(DataRefreshContext);
 }

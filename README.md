@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://roganmohammadjones-ops.github.io/StocckPilot"><strong>🌐 Launch Live Web App</strong></a> •
-  <a href="https://github.com/roganmohammadjones-ops/StocckPilot/releases/tag/v1.0.7"><strong>📱 Download Android APK (v1.0.7)</strong></a> •
+  <a href="https://github.com/roganmohammadjones-ops/StocckPilot/releases/latest"><strong>📱 Download Android APK (v1.0.8)</strong></a> •
   <a href="https://expo.dev/accounts/stockpilotng/projects/stockpilotng"><strong>⚡ EAS Project Dashboard</strong></a>
 </p>
 
@@ -47,10 +47,10 @@ Built with **Expo SDK 57**, **React Native 0.86**, **Expo Router**, **TypeScript
 
 The production Android release is packaged and verified through Continuous Native Generation (CNG) with automated signing:
 
-- **Current Release**: `v1.0.7` (Build code `7`)
+- **Current Release**: `v1.0.8` (Build code `8`)
 - **Package Identifier**: `com.stockpilotng.app`
-- **Tagged Release APK**: **[Download StockPilot-Nigeria-v1.0.7.apk (130.8 MB)](https://github.com/roganmohammadjones-ops/StocckPilot/releases/download/v1.0.7/StockPilot-Nigeria-v1.0.7.apk)**
-- **Continuous Latest APK**: **[Download StockPilot-Nigeria.apk (130.8 MB)](https://github.com/roganmohammadjones-ops/StocckPilot/releases/download/v1.0.7/StockPilot-Nigeria.apk)**
+- **Tagged Release APK**: **[Download StockPilot-Nigeria-v1.0.8.apk](https://github.com/roganmohammadjones-ops/StocckPilot/releases/latest)**
+- **Continuous Latest APK**: **[Download StockPilot-Nigeria.apk](https://github.com/roganmohammadjones-ops/StocckPilot/releases/latest)**
 - **GitHub Releases Page**: **[All Releases & Version Changelogs](https://github.com/roganmohammadjones-ops/StocckPilot/releases)**
 
 > **Installation Note**: On Android, allow "Install from Unknown Sources" or your browser's package installer permission when prompted. The APK is pre-signed and ready for direct installation on physical smartphones and Android POS terminals.

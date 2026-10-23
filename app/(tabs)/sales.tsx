@@ -24,10 +24,12 @@ import {
   closeShift,
   openNewShift,
   getSaleItems,
+  getWaybills,
 } from '@/lib/db/queries';
 import { useResponsive } from '@/hooks/use-responsive';
-import type { SaleRecord, DashboardMetrics, ShiftRecord } from '@/lib/db/types';
+import type { SaleRecord, DashboardMetrics, ShiftRecord, WaybillRecord } from '@/lib/db/types';
 import { printReceipt, shareReceiptPdf } from '@/lib/receipt';
+import { WaybillModal } from '@/components/waybill-modal';
 
 function formatShiftTime(isoString?: string): string {
   if (!isoString) return 'Just now';
@@ -53,6 +55,8 @@ export default function SalesRegisterScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<SaleRecord | null>(null);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [waybillsMap, setWaybillsMap] = useState<Record<string, WaybillRecord>>({});
+  const [activeWaybillSale, setActiveWaybillSale] = useState<SaleRecord | null>(null);
 
   // Shift Closeout & Drawer Reconciliation
   const [showShiftModal, setShowShiftModal] = useState(false);
@@ -63,14 +67,20 @@ export default function SalesRegisterScreen() {
 
   const loadSalesData = useCallback(async () => {
     try {
-      const [salesList, dashMetrics, activeShift] = await Promise.all([
+      const [salesList, dashMetrics, activeShift, waybillsList] = await Promise.all([
         getSales(db, 30),
         getDashboardMetrics(db),
         getCurrentShift(db),
+        getWaybills(db, 100),
       ]);
       setSales(salesList);
       setMetrics(dashMetrics);
       setCurrentShift(activeShift);
+      const wbMap: Record<string, WaybillRecord> = {};
+      for (const wb of waybillsList) {
+        wbMap[wb.saleId] = wb;
+      }
+      setWaybillsMap(wbMap);
     } catch (e) {
       console.error('Failed to load sales register', e);
     }
@@ -528,6 +538,26 @@ export default function SalesRegisterScreen() {
                     <AppIcon name="chevron_right" size={13} color={colors.primary} />
                   </Pressable>
                 </View>
+
+                {waybillsMap[tx.id] ? (
+                  <Pressable
+                    onPress={() => setActiveWaybillSale(tx)}
+                    className="mt-2 pt-1.5 border-t border-cardBorder/60 flex-row items-center justify-between"
+                  >
+                    <View className="flex-row items-center gap-1.5 px-2 py-0.5 rounded-md bg-blue-50 border border-blue-200">
+                      <AppIcon name="local_shipping" size={12} color="#0369a1" />
+                      <Text className="text-[10px] font-bold text-blue-800">
+                        WB #{waybillsMap[tx.id].waybillNo} • {waybillsMap[tx.id].destinationCity}
+                      </Text>
+                    </View>
+                    <View className="flex-row items-center gap-0.5">
+                      <Text className="text-[11px] font-bold capitalize text-primary">
+                        {waybillsMap[tx.id].status.replace('_', ' ')}
+                      </Text>
+                      <AppIcon name="chevron_right" size={12} color={colors.primary} />
+                    </View>
+                  </Pressable>
+                ) : null}
               </View>
             ))}
           </View>
@@ -669,6 +699,24 @@ export default function SalesRegisterScreen() {
                   <AppIcon name="close" size={20} color={colors.onSurfaceVariant} />
                 </Pressable>
               </View>
+
+              {selectedReceipt ? (
+                <Pressable
+                  onPress={() => {
+                    const saleToDispatch = selectedReceipt;
+                    setSelectedReceipt(null);
+                    setActiveWaybillSale(saleToDispatch);
+                  }}
+                  className="w-full h-11 bg-primary/10 border border-primary/30 rounded-xl flex-row items-center justify-center gap-1.5 active:bg-primary/20 shadow-xs mt-1"
+                >
+                  <AppIcon name="local_shipping" size={17} color={colors.primary} />
+                  <Text className="text-xs font-bold text-primary">
+                    {waybillsMap[selectedReceipt.id]
+                      ? `View Waybill Manifest (#${waybillsMap[selectedReceipt.id].waybillNo})`
+                      : 'Issue Interstate Waybill / Dispatch Manifest'}
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
           </View>
         </View>
@@ -851,6 +899,19 @@ export default function SalesRegisterScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* 5. Interstate Waybill & Dispatch Manifest Modal */}
+      {activeWaybillSale && (
+        <WaybillModal
+          visible={Boolean(activeWaybillSale)}
+          onClose={() => setActiveWaybillSale(null)}
+          sale={activeWaybillSale}
+          onWaybillCreated={(wb) => {
+            setWaybillsMap((prev) => ({ ...prev, [wb.saleId]: wb }));
+            loadSalesData();
+          }}
+        />
+      )}
     </View>
   );
 }

@@ -85,6 +85,7 @@ export default function NewSaleModal() {
     changeReturned?: number;
     totalAmount: number;
     discountAmount: number;
+    createdAt: string;
     items: CartItem[];
   } | null>(null);
   const [showWaybillModal, setShowWaybillModal] = useState(false);
@@ -306,6 +307,7 @@ export default function NewSaleModal() {
         changeReturned: paymentChannel === 'cash' ? Math.max(0, changeDue) : undefined,
         totalAmount: grossSubtotal,
         discountAmount: discount,
+        createdAt: new Date().toISOString(),
         items: [...cart],
       });
     } catch (err: any) {
@@ -1208,7 +1210,7 @@ export default function NewSaleModal() {
           visible={showWaybillModal}
           onClose={() => setShowWaybillModal(false)}
           sale={{
-            id: completedSale.id || `sale_${Date.now()}`,
+            id: completedSale.id || completedSale.invoiceNo,
             invoiceNo: completedSale.invoiceNo,
             customerName: completedSale.customerName,
             totalAmount: completedSale.totalAmount,
@@ -1217,7 +1219,7 @@ export default function NewSaleModal() {
             paymentChannel: completedSale.paymentChannel,
             amountTendered: completedSale.amountTendered,
             changeReturned: completedSale.changeReturned,
-            createdAt: new Date().toISOString(),
+            createdAt: completedSale.createdAt,
             itemCount: completedSale.items.length,
             itemsSummary: completedSale.items.map((it) => `${it.name} x${it.quantity}`).join(', '),
           }}
