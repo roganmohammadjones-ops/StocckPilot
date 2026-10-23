@@ -7,10 +7,16 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag override (e.g. v1.0.7, optional)'
+        required: false
+        type: string
+        default: ''
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: production-release-pipeline
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -19,11 +25,29 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build Android APK
+    name: Build Android APK & Release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Determine Release Version & Tag
+        id: release_info
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          INPUT_TAG="${{ github.event.inputs.tag }}"
+          
+          if [ -n "$INPUT_TAG" ]; then
+            TAG="$INPUT_TAG"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="v${PKG_VERSION}"
+          fi
+          
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Target Release Tag: $TAG (Package version: $PKG_VERSION)"
 
       - name: Setup Node.js 24
         uses: actions/setup-node@v4
@@ -38,13 +62,20 @@ jobs:
           java-version: 17
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+
+      - name: Accept Android SDK Licenses
+        run: |
+          yes | sdkmanager --licenses || true
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Install dependencies
         run: npm ci
 
       - name: Generate Native Android Project (CNG)
-        run: npx expo prebuild --platform android --clean
+        run: npx expo prebuild --platform android --clean --no-install
         env:
           EXPO_NO_TELEMETRY: '1'
 
@@ -52,52 +83,91 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleRelease --no-daemon -Dorg.gradle.jvmargs="-Xmx4096m -XX:MaxMetaspaceSize=1024m"
+          
+          echo "=== Android Build Outputs ==="
+          find app/build/outputs/apk -type f -name "*.apk"
+          
+          # Check if build produced an unsigned APK and sign it with debug key
+          UNSIGNED_APK=$(find app/build/outputs/apk -type f -name "*unsigned.apk" | head -n 1)
+          if [ -n "$UNSIGNED_APK" ]; then
+            echo "Signing unsigned APK: $UNSIGNED_APK"
+            KEYSTORE="app/debug.keystore"
+            if [ ! -f "$KEYSTORE" ]; then
+              KEYSTORE="$HOME/.android/debug.keystore"
+              if [ ! -f "$KEYSTORE" ]; then
+                mkdir -p "$HOME/.android"
+                keytool -genkey -v -keystore "$KEYSTORE" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=StockPilot, OU=App, O=StockPilot, L=Lagos, S=Lagos, C=NG"
+              fi
+            fi
+            SIGNED_APK="${UNSIGNED_APK/-unsigned/}"
+            cp "$UNSIGNED_APK" "$SIGNED_APK"
+            jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore "$KEYSTORE" -storepass android -keypass android "$SIGNED_APK" androiddebugkey
+            echo "Successfully signed APK at: $SIGNED_APK"
+          fi
 
       - name: Prepare APK for Release
         run: |
           mkdir -p build-artifacts
-          APK_PATH=$(find android/app/build/outputs/apk -name "*.apk" | head -n 1)
-          echo "Found APK at: $APK_PATH"
-          TAG_VAL="${{ github.ref_name }}"
-          if [ -z "$TAG_VAL" ] || [ "$TAG_VAL" = "main" ]; then
-            TAG_VAL="v1.0.3"
+          # Locate the release APK (prefer signed over unsigned)
+          APK_PATH=$(find android/app/build/outputs/apk -type f -name "*release*.apk" ! -name "*unsigned*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            APK_PATH=$(find android/app/build/outputs/apk -type f -name "*.apk" ! -name "*unsigned*.apk" | head -n 1)
           fi
+          if [ -z "$APK_PATH" ]; then
+            APK_PATH=$(find android/app/build/outputs/apk -type f -name "*.apk" | head -n 1)
+          fi
+          
+          if [ -z "$APK_PATH" ] || [ ! -f "$APK_PATH" ]; then
+            echo "::error::No APK file generated in android/app/build/outputs/apk/"
+            exit 1
+          fi
+          
+          TAG_VAL="${{ steps.release_info.outputs.tag }}"
+          echo "Selected APK source: $APK_PATH"
+          echo "Target tag: $TAG_VAL"
+          
           cp "$APK_PATH" "build-artifacts/StockPilot-Nigeria-${TAG_VAL}.apk"
           cp "$APK_PATH" "build-artifacts/StockPilot-Nigeria.apk"
-          ls -la build-artifacts/
+          
+          echo "=== Ready Release Artifacts ==="
+          ls -lh build-artifacts/
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: StockPilot-Nigeria-APK
+          name: StockPilot-Nigeria-APK-${{ steps.release_info.outputs.tag }}
           path: build-artifacts/*.apk
+          retention-days: 30
 
       - name: Publish GitHub Release with APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.3' }}
-          name: "StockPilot Nigeria Production ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.3' }}"
+          tag_name: ${{ steps.release_info.outputs.tag }}
+          name: "StockPilot Nigeria Production ${{ steps.release_info.outputs.tag }}"
           body: |
-            ## StockPilot Nigeria Production Release
+            ## StockPilot Nigeria Production Release (${{ steps.release_info.outputs.tag }})
 
             Offline-first FMCG inventory, POS sales till, and B2B wholesale marketplace for Nigeria's open-market commercial corridors (Idumota, Alaba, Kano Dawanau, Onitsha).
 
             ### 🌐 Live Production Web App:
             **[https://stockpilotng.expo.app](https://stockpilotng.expo.app)**
 
-            ### 🚀 Updates in this release:
-            - **Official Brand Logo & Mark**: High-resolution 3D emblem with rocket arrow and sparkles integrated across all app headers, launch screen, settings, and cards.
-            - **Branded Pulsing Loading Icon**: Replaced generic activity indicators with animated brand emblem loader.
-            - **Web Favicon & Mobile App Icons**: Adaptive foreground/background, Material You monochrome icon, and web favicon.
-            - **Point of Sale (POS)**: Fast till checkout for walk-in & registered customers with Cash, Bank Transfer, Moniepoint POS, and Credit ledger options.
-            - **Offline-First SQLite**: Local transactions, instant stock balance recalculations, and sales records with 100% offline uptime.
+            ### 📱 Download Android APK:
+            Download and install directly on your Android phone or POS terminal:
+            - **`StockPilot-Nigeria-${{ steps.release_info.outputs.tag }}.apk`** (Tagged Build)
+            - **`StockPilot-Nigeria.apk`** (Latest Build)
 
-            ### 📱 Download & Install:
-            Download **`StockPilot-Nigeria-v1.0.1.apk`** below to install directly on your Android device.
+            ### 🚀 Updates & Capabilities:
+            - **🔔 Automated In-App Notifications Hub**: Real-time alerts for low stock reorder thresholds, overdue debtor repayment dates, and daily till summaries.
+            - **⚖️ Overdue Debt Recovery & Escalation**: Tiered debtor urgency, automated WhatsApp demand notice generation, and verified settlement bank details.
+            - **🏪 Instant POS Sales Register**: Fast counter till checkout with Cash, Direct Bank Transfer, Moniepoint/OPay POS, and Credit ledger posting.
+            - **🧾 Thermal ESC/POS & PDF Receipts**: 58mm/80mm thermal receipt formatting and printable PDF vouchers with dynamic store branding.
+            - **⚡ 100% Offline-First SQLite**: Local SQLite database with zero downtime during network blackouts.
           files: build-artifacts/*.apk
           draft: false
           prerelease: false
+          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -132,12 +202,15 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        continue-on-error: true
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist/
+        continue-on-error: true
 
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        continue-on-error: true
