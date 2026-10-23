@@ -10,6 +10,7 @@ export interface Product {
   costPrice: number;
   sellingPrice: number;
   wholesalePrice?: number;
+  distributorPrice?: number;
   recentNote?: string;
   status: 'low' | 'healthy' | 'out';
   createdAt?: string;
@@ -38,6 +39,7 @@ export interface SaleItemInput {
   sku: string;
   quantity: number;
   unitPrice: number;
+  priceTier?: 'retail' | 'wholesale' | 'distributor';
 }
 
 export interface SaleInput {

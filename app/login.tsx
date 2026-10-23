@@ -12,9 +12,11 @@ import { AppIcon } from '@/components/icon';
 import { BrandLogo } from '@/components/brand-logo';
 import { colors } from '@/lib/theme';
 import { loginWithCredentials, loginWithDemo, getStoredUser } from '@/lib/auth';
+import { useResponsive } from '@/hooks/use-responsive';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { horizontalPadding } = useResponsive();
   const currentUser = getStoredUser();
   const [authMode, setAuthMode] = useState<'phone' | 'email'>('phone');
   const [phone, setPhone] = useState('');
@@ -58,33 +60,36 @@ export default function LoginScreen() {
   return (
     <View className="flex-1 bg-surface">
       {/* Top Header */}
-      <View className="flex-row items-center justify-between px-4 py-3 bg-white border-b border-cardBorder">
-        <Pressable
-          onPress={() => router.back()}
-          className="w-10 h-10 items-center justify-center rounded-full active:bg-surfaceContainer"
-        >
-          <AppIcon name="arrow_back" size={22} color={colors.onSurface} />
-        </Pressable>
-        <View className="flex-row items-center gap-2">
-          <BrandLogo variant="emblem" size={26} />
-          <Text className="text-base font-bold text-onSurface">StockPilot NG</Text>
-        </View>
-        {currentUser ? (
+      <View className="bg-white border-b border-cardBorder">
+        <View className="max-w-md mx-auto w-full flex-row items-center justify-between px-4 py-3">
           <Pressable
-            onPress={() => router.replace('/(tabs)')}
-            className="px-2.5 py-1 rounded-full bg-secondaryContainer active:bg-secondaryContainer/80"
+            onPress={() => router.back()}
+            className="w-10 h-10 items-center justify-center rounded-full active:bg-surfaceContainer"
           >
-            <Text className="text-[11px] font-bold text-onSecondaryContainer">Dashboard</Text>
+            <AppIcon name="arrow_back" size={22} color={colors.onSurface} />
           </Pressable>
-        ) : (
-          <View className="w-10" />
-        )}
+          <View className="flex-row items-center gap-2">
+            <BrandLogo variant="emblem" size={26} />
+            <Text className="text-base font-bold text-onSurface">StockPilot NG</Text>
+          </View>
+          {currentUser ? (
+            <Pressable
+              onPress={() => router.replace('/(tabs)')}
+              className="px-2.5 py-1 rounded-full bg-secondaryContainer active:bg-secondaryContainer/80"
+            >
+              <Text className="text-[11px] font-bold text-onSecondaryContainer">Dashboard</Text>
+            </Pressable>
+          ) : (
+            <View className="w-10" />
+          )}
+        </View>
       </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
+        contentContainerStyle={{ paddingHorizontal: horizontalPadding, paddingTop: 20, paddingBottom: 60 }}
       >
+        <View className="max-w-md mx-auto w-full">
         {/* Already logged in session reminder */}
         {currentUser && (
           <View className="p-3 rounded-xl bg-secondaryContainer mb-4 flex-row items-center justify-between border border-cardBorder shadow-xs">
@@ -297,7 +302,8 @@ export default function LoginScreen() {
             </Text>
           </Text>
         </View>
-      </ScrollView>
-    </View>
-  );
+      </View>
+    </ScrollView>
+  </View>
+);
 }

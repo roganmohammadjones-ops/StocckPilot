@@ -10,10 +10,12 @@ import { AppIcon } from '@/components/icon';
 import { BrandLogo } from '@/components/brand-logo';
 import { colors } from '@/lib/theme';
 import { useStoreProfile } from '@/lib/store-profile';
+import { useResponsive } from '@/hooks/use-responsive';
 
 export default function OrderReviewScreen() {
   const router = useRouter();
   const store = useStoreProfile();
+  const { horizontalPadding } = useResponsive();
   const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'delivery'>('pickup');
 
   const subtotal = 108700;
@@ -24,37 +26,40 @@ export default function OrderReviewScreen() {
   return (
     <View className="flex-1 bg-surface">
       {/* Top Header */}
-      <View className="flex-row items-center justify-between px-4 py-3 bg-white border-b border-cardBorder">
-        <Pressable
-          onPress={() => router.back()}
-          className="w-10 h-10 items-center justify-center rounded-full active:bg-surfaceContainer"
-        >
-          <AppIcon name="arrow_back" size={22} color={colors.onSurface} />
-        </Pressable>
-        <Text className="text-base font-bold text-onSurface">Cart & Checkout Review</Text>
-        <BrandLogo variant="emblem" size={28} />
+      <View className="bg-white border-b border-cardBorder">
+        <View className="max-w-2xl mx-auto w-full flex-row items-center justify-between px-4 py-3">
+          <Pressable
+            onPress={() => router.back()}
+            className="w-10 h-10 items-center justify-center rounded-full active:bg-surfaceContainer"
+          >
+            <AppIcon name="arrow_back" size={22} color={colors.onSurface} />
+          </Pressable>
+          <Text className="text-base font-bold text-onSurface">Cart & Checkout Review</Text>
+          <BrandLogo variant="emblem" size={28} />
+        </View>
       </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+        contentContainerStyle={{ paddingHorizontal: horizontalPadding, paddingTop: 16, paddingBottom: 110 }}
       >
+        <View className="max-w-2xl mx-auto w-full">
         {/* Stepper & Lock Pill */}
-        <View className="flex-row items-center justify-between py-2 mb-3">
-          <View className="flex-row items-center gap-1.5">
-            <View className="w-5 h-5 rounded-full bg-primary items-center justify-center">
+        <View className="flex-row items-center justify-between gap-2 py-2 mb-3">
+          <View className="flex-row items-center gap-1.5 shrink min-w-0">
+            <View className="w-5 h-5 rounded-full bg-primary items-center justify-center shrink-0">
               <Text className="text-[11px] font-bold text-white">1</Text>
             </View>
-            <Text className="text-xs font-bold text-primary">Order Review</Text>
+            <Text numberOfLines={1} className="text-xs font-bold text-primary shrink truncate">Order Review</Text>
             <AppIcon name="chevron_right" size={14} color={colors.outline} />
-            <View className="w-5 h-5 rounded-full bg-surfaceContainerHigh items-center justify-center">
+            <View className="w-5 h-5 rounded-full bg-surfaceContainerHigh items-center justify-center shrink-0">
               <Text className="text-[11px] font-bold text-onSurfaceVariant">2</Text>
             </View>
-            <Text className="text-xs text-onSurfaceVariant">Instant Verify</Text>
+            <Text numberOfLines={1} className="text-xs text-onSurfaceVariant shrink truncate">Instant Verify</Text>
           </View>
 
-          <View className="flex-row items-center gap-1 bg-secondaryContainer px-2 py-0.5 rounded-full">
-            <View className="w-2 h-2 rounded-full bg-primary" />
+          <View className="flex-row items-center gap-1 bg-secondaryContainer px-2 py-0.5 rounded-full shrink-0">
+            <View className="w-2 h-2 rounded-full bg-primary shrink-0" />
             <Text className="text-[10px] font-bold text-onSecondaryContainer">
               Live Stock Locked
             </Text>
@@ -180,27 +185,30 @@ export default function OrderReviewScreen() {
             </Pressable>
           </View>
         </View>
+        </View>
       </ScrollView>
 
       {/* Sticky Bottom Checkout Dock */}
       <View className="absolute bottom-0 inset-x-0 bg-white/95 border-t border-cardBorder px-4 py-3 pb-6 shadow-xl">
-        <Pressable
-          onPress={() =>
-            router.push({
-              pathname: '/otp-verify',
-              params: {
-                phone: store.phone || '+234 800 000 0000',
-                businessName: store.businessName || 'Wholesale Depot Order',
-              },
-            })
-          }
-          className="w-full h-12 rounded-xl bg-primary items-center justify-center flex-row gap-2 active:bg-secondary shadow-md"
-        >
-          <Text className="text-white font-bold text-sm">
-            Verify & Confirm Order (₦{total.toLocaleString()})
-          </Text>
-          <AppIcon name="arrow_forward" size={18} color="#ffffff" />
-        </Pressable>
+        <View className="max-w-2xl mx-auto w-full">
+          <Pressable
+            onPress={() =>
+              router.push({
+                pathname: '/otp-verify',
+                params: {
+                  phone: store.phone || '+234 800 000 0000',
+                  businessName: store.businessName || 'Wholesale Depot Order',
+                },
+              })
+            }
+            className="w-full h-12 rounded-xl bg-primary items-center justify-center flex-row gap-2 active:bg-secondary shadow-md"
+          >
+            <Text className="text-white font-bold text-sm">
+              Verify & Confirm Order (₦{total.toLocaleString()})
+            </Text>
+            <AppIcon name="arrow_forward" size={18} color="#ffffff" />
+          </Pressable>
+        </View>
       </View>
     </View>
   );

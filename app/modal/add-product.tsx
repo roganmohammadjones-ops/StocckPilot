@@ -14,12 +14,14 @@ import { colors } from '@/lib/theme';
 import { addProduct } from '@/lib/db/queries';
 import { useDataRefresh, useAppDb } from '@/lib/db/provider';
 import { BarcodeScannerModal } from '@/components/barcode-scanner-modal';
+import { useResponsive } from '@/hooks/use-responsive';
 
 export default function AddProductModal() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const db = useAppDb();
   const { triggerRefresh } = useDataRefresh();
+  const { isWide } = useResponsive();
 
   const [name, setName] = useState('');
   const [sku, setSku] = useState('');
@@ -28,6 +30,7 @@ export default function AddProductModal() {
   const [costPrice, setCostPrice] = useState('');
   const [retailPrice, setRetailPrice] = useState('');
   const [tier2Price, setTier2Price] = useState('');
+  const [tier3Price, setTier3Price] = useState('');
   const [openingStock, setOpeningStock] = useState('');
   const [minAlert, setMinAlert] = useState('10');
   const [saving, setSaving] = useState(false);
@@ -36,12 +39,16 @@ export default function AddProductModal() {
   const cost = parseFloat(costPrice) || 0;
   const retail = parseFloat(retailPrice) || 0;
   const tier2 = parseFloat(tier2Price) || 0;
+  const tier3 = parseFloat(tier3Price) || 0;
 
   const profit = retail - cost;
   const profitMarginPct = cost > 0 ? ((profit / cost) * 100).toFixed(1) : '0.0';
 
   const tier2Profit = tier2 - cost;
   const tier2MarginPct = cost > 0 ? ((tier2Profit / cost) * 100).toFixed(1) : '0.0';
+
+  const tier3Profit = tier3 - cost;
+  const tier3MarginPct = cost > 0 ? ((tier3Profit / cost) * 100).toFixed(1) : '0.0';
 
   const isHealthyMargin = parseFloat(profitMarginPct) >= 8.0;
 
@@ -76,6 +83,7 @@ export default function AddProductModal() {
         costPrice: cost,
         sellingPrice: retail,
         wholesalePrice: tier2 > 0 ? tier2 : undefined,
+        distributorPrice: tier3 > 0 ? tier3 : undefined,
         recentNote: 'Recently registered SKU',
       });
       triggerRefresh();
@@ -119,23 +127,25 @@ export default function AddProductModal() {
         style={{ paddingTop: Math.max(insets.top, 16) }}
         className="bg-white border-b border-cardBorder px-4 pb-3"
       >
-        <View className="w-12 h-1.5 bg-outlineVariant rounded-full self-center mb-2" />
-        <View className="flex-row items-center justify-between">
-          <View className="flex-1 mr-2">
-            <View className="flex-row items-center gap-1.5">
-              <AppIcon name="add_box" size={20} color={colors.primary} />
-              <Text className="text-lg font-bold text-onSurface">Add New Product SKU</Text>
+        <View className="w-full max-w-2xl mx-auto">
+          <View className="w-12 h-1.5 bg-outlineVariant rounded-full self-center mb-2" />
+          <View className="flex-row items-center justify-between">
+            <View className="flex-1 mr-2">
+              <View className="flex-row items-center gap-1.5">
+                <AppIcon name="add_box" size={20} color={colors.primary} />
+                <Text className="text-lg font-bold text-onSurface">Add New Product SKU</Text>
+              </View>
+              <Text className="text-xs text-onSurfaceVariant mt-0.5">
+                Create SKU with instant landed margin calculation
+              </Text>
             </View>
-            <Text className="text-xs text-onSurfaceVariant mt-0.5">
-              Create SKU with instant landed margin calculation
-            </Text>
+            <Pressable
+              onPress={() => router.back()}
+              className="w-9 h-9 rounded-full bg-surfaceContainerLow items-center justify-center active:bg-surfaceContainer"
+            >
+              <AppIcon name="close" size={20} color={colors.onSurfaceVariant} />
+            </Pressable>
           </View>
-          <Pressable
-            onPress={() => router.back()}
-            className="w-9 h-9 rounded-full bg-surfaceContainerLow items-center justify-center active:bg-surfaceContainer"
-          >
-            <AppIcon name="close" size={20} color={colors.onSurfaceVariant} />
-          </Pressable>
         </View>
       </View>
 
@@ -143,8 +153,9 @@ export default function AddProductModal() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40 }}
       >
-        {/* Quick Barcode Scan Card */}
-        <View className="bg-white rounded-xl p-3.5 border border-cardBorder shadow-sm mb-4">
+        <View className="w-full max-w-2xl mx-auto">
+          {/* Quick Barcode Scan Card */}
+          <View className="bg-white rounded-xl p-3.5 border border-cardBorder shadow-sm mb-4">
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center gap-3 flex-1 mr-2">
               <View className="w-11 h-11 rounded-lg bg-surfaceContainer items-center justify-center">
@@ -284,35 +295,38 @@ export default function AddProductModal() {
             </View>
           </View>
 
-          {/* Cost Price */}
-          <View>
-            <Text className="text-xs font-semibold text-onSurfaceVariant mb-1">
-              Landed Cost per Unit (Delivery & Offloading)
-            </Text>
-            <View className="flex-row items-center bg-surfaceContainerLow rounded-xl border border-cardBorder px-3 h-11">
-              <Text className="text-sm font-bold text-outline mr-2">₦</Text>
-              <TextInput
-                value={costPrice}
-                onChangeText={setCostPrice}
-                keyboardType="numeric"
-                className="flex-1 text-sm font-bold text-onSurface p-0"
-              />
+          {/* Cost & Retail Price Grid */}
+          <View className={isWide ? 'flex-row gap-3' : 'gap-3.5'}>
+            {/* Cost Price */}
+            <View className={isWide ? 'flex-1' : 'w-full'}>
+              <Text className="text-xs font-semibold text-onSurfaceVariant mb-1">
+                Landed Cost per Unit (Delivery & Offloading)
+              </Text>
+              <View className="flex-row items-center bg-surfaceContainerLow rounded-xl border border-cardBorder px-3 h-11">
+                <Text className="text-sm font-bold text-outline mr-2">₦</Text>
+                <TextInput
+                  value={costPrice}
+                  onChangeText={setCostPrice}
+                  keyboardType="numeric"
+                  className="flex-1 text-sm font-bold text-onSurface p-0"
+                />
+              </View>
             </View>
-          </View>
 
-          {/* Retail Selling Price */}
-          <View>
-            <Text className="text-xs font-semibold text-onSurfaceVariant mb-1">
-              Primary Selling / Counter Price
-            </Text>
-            <View className="flex-row items-center bg-surfaceContainerLow rounded-xl border border-cardBorder px-3 h-11">
-              <Text className="text-sm font-bold text-outline mr-2">₦</Text>
-              <TextInput
-                value={retailPrice}
-                onChangeText={setRetailPrice}
-                keyboardType="numeric"
-                className="flex-1 text-sm font-bold text-primary p-0"
-              />
+            {/* Retail Selling Price */}
+            <View className={isWide ? 'flex-1' : 'w-full'}>
+              <Text className="text-xs font-semibold text-onSurfaceVariant mb-1">
+                Primary Selling / Counter Price
+              </Text>
+              <View className="flex-row items-center bg-surfaceContainerLow rounded-xl border border-cardBorder px-3 h-11">
+                <Text className="text-sm font-bold text-outline mr-2">₦</Text>
+                <TextInput
+                  value={retailPrice}
+                  onChangeText={setRetailPrice}
+                  keyboardType="numeric"
+                  className="flex-1 text-sm font-bold text-primary p-0"
+                />
+              </View>
             </View>
           </View>
 
@@ -320,15 +334,38 @@ export default function AddProductModal() {
           <View>
             <View className="flex-row items-center justify-between mb-1">
               <Text className="text-xs font-semibold text-onSurfaceVariant">
-                Wholesale Tier 2 Price
+                Wholesale Tier 2 Price (Optional)
               </Text>
-              <Text className="text-[11px] text-outline">Bulk ≥ 10 Cartons</Text>
+              <Text className="text-[11px] text-outline">Bulk ≥ 5 Units</Text>
             </View>
             <View className="flex-row items-center bg-surfaceContainerLow rounded-xl border border-cardBorder px-3 h-11">
               <Text className="text-sm font-bold text-outline mr-2">₦</Text>
               <TextInput
                 value={tier2Price}
                 onChangeText={setTier2Price}
+                placeholder={retail > 0 ? `${Math.round(retail * 0.93)} (Suggested 7% off)` : 'Optional'}
+                placeholderTextColor={colors.outline}
+                keyboardType="numeric"
+                className="flex-1 text-sm font-bold text-onSurface p-0"
+              />
+            </View>
+          </View>
+
+          {/* Distributor Tier 3 Price */}
+          <View>
+            <View className="flex-row items-center justify-between mb-1">
+              <Text className="text-xs font-semibold text-onSurfaceVariant">
+                Distributor Tier 3 Price (Optional)
+              </Text>
+              <Text className="text-[11px] text-outline">Pallet / Dealer ≥ 20 Units</Text>
+            </View>
+            <View className="flex-row items-center bg-surfaceContainerLow rounded-xl border border-cardBorder px-3 h-11">
+              <Text className="text-sm font-bold text-outline mr-2">₦</Text>
+              <TextInput
+                value={tier3Price}
+                onChangeText={setTier3Price}
+                placeholder={retail > 0 ? `${Math.round(retail * 0.88)} (Suggested 12% off)` : 'Optional'}
+                placeholderTextColor={colors.outline}
                 keyboardType="numeric"
                 className="flex-1 text-sm font-bold text-onSurface p-0"
               />
@@ -337,7 +374,7 @@ export default function AddProductModal() {
 
           {/* Live Landed Margin Output Box */}
           <View
-            className={`rounded-2xl p-3.5 gap-2 ${
+            className={`rounded-2xl p-3.5 gap-2.5 ${
               isHealthyMargin ? 'bg-secondaryContainer/50' : 'bg-errorContainer/50'
             }`}
           >
@@ -348,7 +385,7 @@ export default function AddProductModal() {
                   size={16}
                   color={isHealthyMargin ? colors.primary : colors.error}
                 />
-                <Text className="text-xs font-bold text-onSurface">Gross Profit per Unit</Text>
+                <Text className="text-xs font-bold text-onSurface">Multi-Tier Margin Preview</Text>
               </View>
               <View
                 className={`px-2.5 py-0.5 rounded-full ${
@@ -356,21 +393,43 @@ export default function AddProductModal() {
                 }`}
               >
                 <Text className="text-xs font-bold text-white">
-                  {profit >= 0 ? `+${profitMarginPct}%` : `${profitMarginPct}%`}
+                  {profit >= 0 ? `+${profitMarginPct}% Retail` : `${profitMarginPct}%`}
                 </Text>
               </View>
             </View>
 
-            <View className="flex-row items-baseline justify-between pt-1">
-              <Text className="text-2xl font-bold text-primary tracking-tight">
-                {profit >= 0 ? `+₦${profit.toLocaleString()}` : `-₦${Math.abs(profit).toLocaleString()}`}
-              </Text>
-              <Text className="text-xs text-onSurfaceVariant">
-                Tier 2: +₦{tier2Profit.toLocaleString()} ({tier2MarginPct}%)
-              </Text>
+            {/* 3-Tier Comparison Badges */}
+            <View className="flex-row items-center justify-between gap-1.5 bg-white/60 p-2 rounded-xl border border-cardBorder">
+              <View className="flex-1">
+                <Text className="text-[10px] font-bold text-onSurfaceVariant uppercase">Retail</Text>
+                <Text className="text-xs font-bold text-primary mt-0.5">
+                  {profit >= 0 ? `+₦${profit.toLocaleString()}` : `-₦${Math.abs(profit).toLocaleString()}`}
+                </Text>
+                <Text className="text-[10px] text-outline">{profitMarginPct}%</Text>
+              </View>
+
+              <View className="w-px h-7 bg-cardBorder" />
+
+              <View className="flex-1">
+                <Text className="text-[10px] font-bold text-onSurfaceVariant uppercase">Wholesale</Text>
+                <Text className="text-xs font-bold text-onSurface mt-0.5">
+                  {tier2 > 0 ? `+₦${tier2Profit.toLocaleString()}` : '—'}
+                </Text>
+                <Text className="text-[10px] text-outline">{tier2 > 0 ? `${tier2MarginPct}%` : 'Standard'}</Text>
+              </View>
+
+              <View className="w-px h-7 bg-cardBorder" />
+
+              <View className="flex-1">
+                <Text className="text-[10px] font-bold text-onSurfaceVariant uppercase">Distributor</Text>
+                <Text className="text-xs font-bold text-secondary mt-0.5">
+                  {tier3 > 0 ? `+₦${tier3Profit.toLocaleString()}` : '—'}
+                </Text>
+                <Text className="text-[10px] text-outline">{tier3 > 0 ? `${tier3MarginPct}%` : 'Bulk'}</Text>
+              </View>
             </View>
 
-            <View className="flex-row items-center gap-1.5 pt-1">
+            <View className="flex-row items-center gap-1.5 pt-0.5">
               <AppIcon name="verified_user" size={14} color={colors.secondary} />
               <Text className="text-[11px] text-onSurfaceVariant flex-1">
                 {isHealthyMargin
@@ -416,19 +475,20 @@ export default function AddProductModal() {
           </View>
         </View>
 
-        {/* Save CTA */}
-        <Pressable
-          onPress={handleSave}
-          disabled={saving}
-          className={`w-full h-14 bg-primary rounded-2xl flex-row items-center justify-center gap-2 shadow-lg active:bg-primaryContainer ${
-            saving ? 'opacity-60' : ''
-          }`}
-        >
-          <AppIcon name="check_circle" size={20} color="#ffffff" />
-          <Text className="text-base font-bold text-white">
-            {saving ? 'Saving Product...' : 'Save Product & Update Warehouse'}
-          </Text>
-        </Pressable>
+          {/* Save CTA */}
+          <Pressable
+            onPress={handleSave}
+            disabled={saving}
+            className={`w-full h-14 bg-primary rounded-2xl flex-row items-center justify-center gap-2 shadow-lg active:bg-primaryContainer ${
+              saving ? 'opacity-60' : ''
+            }`}
+          >
+            <AppIcon name="check_circle" size={20} color="#ffffff" />
+            <Text className="text-base font-bold text-white">
+              {saving ? 'Saving Product...' : 'Save Product & Update Warehouse'}
+            </Text>
+          </Pressable>
+        </View>
       </ScrollView>
 
       <BarcodeScannerModal

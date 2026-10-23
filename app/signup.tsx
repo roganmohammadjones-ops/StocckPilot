@@ -12,11 +12,13 @@ import { BrandLogo } from '@/components/brand-logo';
 import { colors } from '@/lib/theme';
 import { signupMerchant } from '@/lib/auth';
 import { resetStoreProfileToStandard, TRADING_HUBS } from '@/lib/store-profile';
+import { useResponsive } from '@/hooks/use-responsive';
 
 const tradingHubs = TRADING_HUBS;
 
 export default function SignupScreen() {
   const router = useRouter();
+  const { horizontalPadding } = useResponsive();
   const [businessName, setBusinessName] = useState('');
   const [ownerName, setOwnerName] = useState('');
   const [phone, setPhone] = useState('');
@@ -65,24 +67,27 @@ export default function SignupScreen() {
   return (
     <View className="flex-1 bg-surface">
       {/* Top Header */}
-      <View className="flex-row items-center justify-between px-4 py-3 bg-white border-b border-cardBorder">
-        <Pressable
-          onPress={() => router.back()}
-          className="w-10 h-10 items-center justify-center rounded-full active:bg-surfaceContainer"
-        >
-          <AppIcon name="arrow_back" size={22} color={colors.onSurface} />
-        </Pressable>
-        <View className="flex-row items-center gap-2">
-          <BrandLogo variant="emblem" size={26} />
-          <Text className="text-base font-bold text-onSurface">StockPilot NG</Text>
+      <View className="bg-white border-b border-cardBorder">
+        <View className="max-w-md mx-auto w-full flex-row items-center justify-between px-4 py-3">
+          <Pressable
+            onPress={() => router.back()}
+            className="w-10 h-10 items-center justify-center rounded-full active:bg-surfaceContainer"
+          >
+            <AppIcon name="arrow_back" size={22} color={colors.onSurface} />
+          </Pressable>
+          <View className="flex-row items-center gap-2">
+            <BrandLogo variant="emblem" size={26} />
+            <Text className="text-base font-bold text-onSurface">StockPilot NG</Text>
+          </View>
+          <View className="w-10" />
         </View>
-        <View className="w-10" />
       </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
+        contentContainerStyle={{ paddingHorizontal: horizontalPadding, paddingTop: 20, paddingBottom: 60 }}
       >
+        <View className="max-w-md mx-auto w-full">
         <BrandLogo variant="full" width={135} className="mb-4" />
 
         {/* Step Indicator */}
@@ -394,7 +399,8 @@ export default function SignupScreen() {
             </Text>
           </Text>
         </View>
-      </ScrollView>
-    </View>
-  );
+      </View>
+    </ScrollView>
+  </View>
+);
 }

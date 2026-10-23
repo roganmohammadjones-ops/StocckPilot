@@ -13,12 +13,14 @@ import { AppIcon } from '@/components/icon';
 import { colors } from '@/lib/theme';
 import { addExpense } from '@/lib/db/queries';
 import { useDataRefresh, useAppDb } from '@/lib/db/provider';
+import { useResponsive } from '@/hooks/use-responsive';
 
 export default function RecordExpenseModal() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const db = useAppDb();
   const { triggerRefresh } = useDataRefresh();
+  const { isWide } = useResponsive();
 
   const [category, setCategory] = useState('Generator & Diesel');
   const [amount, setAmount] = useState('');
@@ -80,23 +82,25 @@ export default function RecordExpenseModal() {
         style={{ paddingTop: Math.max(insets.top, 16) }}
         className="bg-white border-b border-cardBorder px-4 pb-3"
       >
-        <View className="w-12 h-1.5 bg-outlineVariant rounded-full self-center mb-2" />
-        <View className="flex-row items-center justify-between">
-          <View className="flex-1 mr-2">
-            <View className="flex-row items-center gap-1.5">
-              <AppIcon name="wallet" size={20} color={colors.error} />
-              <Text className="text-lg font-bold text-onSurface">Record Cash Outflow</Text>
+        <View className="w-full max-w-xl mx-auto">
+          <View className="w-12 h-1.5 bg-outlineVariant rounded-full self-center mb-2" />
+          <View className="flex-row items-center justify-between">
+            <View className="flex-1 mr-2">
+              <View className="flex-row items-center gap-1.5">
+                <AppIcon name="wallet" size={20} color={colors.error} />
+                <Text className="text-lg font-bold text-onSurface">Record Cash Outflow</Text>
+              </View>
+              <Text className="text-xs text-onSurfaceVariant mt-0.5">
+                Log store overhead, diesel, union levies & staff expenses
+              </Text>
             </View>
-            <Text className="text-xs text-onSurfaceVariant mt-0.5">
-              Log store overhead, diesel, union levies & staff expenses
-            </Text>
+            <Pressable
+              onPress={() => router.back()}
+              className="w-9 h-9 rounded-full bg-surfaceContainerLow items-center justify-center active:bg-surfaceContainer"
+            >
+              <AppIcon name="close" size={20} color={colors.onSurfaceVariant} />
+            </Pressable>
           </View>
-          <Pressable
-            onPress={() => router.back()}
-            className="w-9 h-9 rounded-full bg-surfaceContainerLow items-center justify-center active:bg-surfaceContainer"
-          >
-            <AppIcon name="close" size={20} color={colors.onSurfaceVariant} />
-          </Pressable>
         </View>
       </View>
 
@@ -104,8 +108,9 @@ export default function RecordExpenseModal() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40 }}
       >
-        {/* Amount Input */}
-        <View className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm mb-4">
+        <View className="w-full max-w-xl mx-auto">
+          {/* Amount Input */}
+          <View className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm mb-4">
           <Text className="text-xs font-semibold text-onSurfaceVariant mb-1.5">
             Expense Outflow Amount
           </Text>
@@ -218,27 +223,29 @@ export default function RecordExpenseModal() {
 
         {/* Description & Voucher Details */}
         <View className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm mb-5 gap-3">
-          <View>
-            <Text className="text-xs font-semibold text-onSurfaceVariant mb-1">
-              Purpose & Notes
-            </Text>
-            <TextInput
-              value={description}
-              onChangeText={setDescription}
-              placeholder="e.g. 10L diesel for generator"
-              placeholderTextColor={colors.outline}
-              className="w-full h-11 px-3 bg-surfaceContainerLow rounded-xl border border-cardBorder text-xs text-onSurface"
-            />
-          </View>
-          <View>
-            <Text className="text-xs font-semibold text-onSurfaceVariant mb-1">
-              Receipt / Voucher Reference
-            </Text>
-            <TextInput
-              value={voucherNo}
-              onChangeText={setVoucherNo}
-              className="w-full h-11 px-3 bg-surfaceContainerLow rounded-xl border border-cardBorder text-xs font-mono font-bold text-onSurface"
-            />
+          <View className={isWide ? 'flex-row gap-3' : 'gap-3'}>
+            <View className={isWide ? 'flex-1' : 'w-full'}>
+              <Text className="text-xs font-semibold text-onSurfaceVariant mb-1">
+                Purpose & Notes
+              </Text>
+              <TextInput
+                value={description}
+                onChangeText={setDescription}
+                placeholder="e.g. 10L diesel for generator"
+                placeholderTextColor={colors.outline}
+                className="w-full h-11 px-3 bg-surfaceContainerLow rounded-xl border border-cardBorder text-xs text-onSurface"
+              />
+            </View>
+            <View className={isWide ? 'flex-1' : 'w-full'}>
+              <Text className="text-xs font-semibold text-onSurfaceVariant mb-1">
+                Receipt / Voucher Reference
+              </Text>
+              <TextInput
+                value={voucherNo}
+                onChangeText={setVoucherNo}
+                className="w-full h-11 px-3 bg-surfaceContainerLow rounded-xl border border-cardBorder text-xs font-mono font-bold text-onSurface"
+              />
+            </View>
           </View>
         </View>
 
@@ -255,6 +262,7 @@ export default function RecordExpenseModal() {
             {isSubmitting ? 'Recording Outflow...' : 'Record Outflow & Deduct from Register'}
           </Text>
         </Pressable>
+        </View>
       </ScrollView>
     </View>
 

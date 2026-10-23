@@ -28,12 +28,14 @@ import {
   TRADING_HUBS,
 } from '@/lib/store-profile';
 import { clearAllDatabaseRecords, seedStandardSampleCatalog } from '@/lib/db/queries';
+import { useResponsive } from '@/hooks/use-responsive';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const db = useAppDb();
   const { triggerRefresh } = useDataRefresh();
   const store = useStoreProfile();
+  const { isWide } = useResponsive();
 
   const [isSyncing, setIsSyncing] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
@@ -229,8 +231,9 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 60 }}
       >
-        {/* Business Profile Card */}
-        <View className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm mb-4">
+        <View className="w-full max-w-5xl mx-auto">
+          {/* Business Profile Card */}
+          <View className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm mb-4">
           <View className="flex-row items-center justify-between mb-3">
             <View className="flex-row items-center gap-3 flex-1 min-w-0 mr-2">
               <View className="w-14 h-14 rounded-2xl bg-secondaryContainer/50 items-center justify-center border border-cardBorder shadow-sm overflow-hidden">
@@ -285,12 +288,16 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* Settlement Accounts */}
-        <View className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm mb-4">
-          <View className="flex-row items-center justify-between mb-3">
-            <Text className="text-xs font-bold text-onSurfaceVariant uppercase tracking-wider">
-              Settlement Accounts
-            </Text>
+        {/* 2-Column Responsive Settings Layout on Tablets & Desktops */}
+        <View className={isWide ? 'flex-row items-start gap-5' : ''}>
+          {/* Left Column: Accounts & Session */}
+          <View className={isWide ? 'flex-1' : 'w-full'}>
+            {/* Settlement Accounts */}
+            <View className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm mb-4">
+              <View className="flex-row items-center justify-between mb-3">
+                <Text className="text-xs font-bold text-onSurfaceVariant uppercase tracking-wider">
+                  Settlement Accounts
+                </Text>
             <Pressable
               onPress={() => setShowAddAccountModal(true)}
               className="flex-row items-center gap-1 px-2.5 py-1 rounded-md bg-secondaryContainer active:opacity-80"
@@ -397,6 +404,29 @@ export default function SettingsScreen() {
           )}
         </View>
 
+        {/* Session Management */}
+        <View className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm mb-4">
+          <Text className="text-sm font-bold text-onSurface mb-1">Session & Account</Text>
+          <Text className="text-xs text-onSurfaceVariant mb-4">
+            Reset current login session or switch account.
+          </Text>
+
+          <Pressable
+            onPress={() => {
+              logout();
+              router.replace('/onboarding');
+            }}
+            className="w-full h-11 rounded-xl bg-surfaceContainerLow border border-cardBorder items-center justify-center active:bg-surfaceContainer"
+          >
+            <Text className="text-xs font-bold text-onSurface">
+              Sign Out & Return to Welcome Tour
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Right Column: Hardware & Database Infrastructure */}
+      <View className={isWide ? 'flex-1' : 'w-full'}>
         {/* Hardware & Printers */}
         <View className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm mb-4">
           <Text className="text-xs font-bold text-onSurfaceVariant uppercase tracking-wider mb-3">
@@ -527,26 +557,6 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* Session Management */}
-        <View className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm mb-6">
-          <Text className="text-sm font-bold text-onSurface mb-1">Session & Account</Text>
-          <Text className="text-xs text-onSurfaceVariant mb-4">
-            Reset current login session or switch account.
-          </Text>
-
-          <Pressable
-            onPress={() => {
-              logout();
-              router.replace('/onboarding');
-            }}
-            className="w-full h-11 rounded-xl bg-surfaceContainerLow border border-cardBorder items-center justify-center active:bg-surfaceContainer"
-          >
-            <Text className="text-xs font-bold text-onSurface">
-              Sign Out & Return to Welcome Tour
-            </Text>
-          </Pressable>
-        </View>
-
         {/* Footer Brand Identity */}
         <View className="items-center py-4 mb-4">
           <BrandLogo variant="full" width={120} className="mb-2" />
@@ -557,7 +567,10 @@ export default function SettingsScreen() {
             Production Build 1.0.1 • CBN & CAC Compliant Architecture
           </Text>
         </View>
-      </ScrollView>
+      </View>
+    </View>
+  </View>
+</ScrollView>
 
       {/* Edit Store Profile Modal */}
       <Modal
@@ -566,8 +579,8 @@ export default function SettingsScreen() {
         animationType="slide"
         onRequestClose={() => setShowEditProfileModal(false)}
       >
-        <View className="flex-1 bg-black/60 justify-end">
-          <View className="bg-white rounded-t-3xl p-5 max-h-[85%]">
+        <View className={`flex-1 bg-black/60 ${isWide ? 'justify-center items-center p-4' : 'justify-end'}`}>
+          <View className={`bg-white p-5 ${isWide ? 'w-full max-w-lg rounded-3xl max-h-[85%] border border-cardBorder shadow-2xl' : 'rounded-t-3xl max-h-[85%]'}`}>
             <View className="w-12 h-1 bg-outlineVariant rounded-full self-center mb-3" />
             <View className="flex-row items-center justify-between pb-3 border-b border-cardBorder mb-4">
               <View>
@@ -699,8 +712,8 @@ export default function SettingsScreen() {
         animationType="slide"
         onRequestClose={() => setShowAddAccountModal(false)}
       >
-        <View className="flex-1 bg-black/60 justify-end">
-          <View className="bg-white rounded-t-3xl p-5 max-h-[85%]">
+        <View className={`flex-1 bg-black/60 ${isWide ? 'justify-center items-center p-4' : 'justify-end'}`}>
+          <View className={`bg-white p-5 ${isWide ? 'w-full max-w-lg rounded-3xl max-h-[85%] border border-cardBorder shadow-2xl' : 'rounded-t-3xl max-h-[85%]'}`}>
             <View className="w-12 h-1 bg-outlineVariant rounded-full self-center mb-3" />
             <View className="flex-row items-center justify-between pb-3 border-b border-cardBorder mb-4">
               <View>

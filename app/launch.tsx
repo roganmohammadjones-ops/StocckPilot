@@ -76,9 +76,10 @@ export default function LaunchSplashScreen() {
   const currentStep = steps[currentStepIdx];
 
   return (
-    <View className="flex-1 bg-[#021811] justify-between px-4 py-8 select-none">
-      {/* Top System & Connectivity Status Header */}
-      <View className="w-full flex-row items-center justify-between pt-2">
+    <View className="flex-1 bg-[#021811] select-none">
+      <View className="flex-1 max-w-xl mx-auto w-full justify-between px-4 py-8">
+        {/* Top System & Connectivity Status Header */}
+        <View className="w-full flex-row items-center justify-between pt-2">
         {/* Resilience Badge */}
         <View className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#053322]/80 border border-[#166534]">
           <View className="w-2 h-2 rounded-full bg-[#22c55e]" />
@@ -216,5 +217,6 @@ export default function LaunchSplashScreen() {
         </View>
       </View>
     </View>
-  );
+  </View>
+);
 }

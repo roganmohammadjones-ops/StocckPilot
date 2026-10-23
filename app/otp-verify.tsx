@@ -26,9 +26,11 @@ import {
   hasTermiiApiKey,
   OtpChannel,
 } from '@/lib/otp';
+import { useResponsive } from '@/hooks/use-responsive';
 
 export default function OtpVerifyScreen() {
   const router = useRouter();
+  const { horizontalPadding } = useResponsive();
   const params = useLocalSearchParams<{
     phone?: string;
     businessName?: string;
@@ -314,21 +316,24 @@ export default function OtpVerifyScreen() {
   return (
     <View className="flex-1 bg-surface">
       {/* Top Header */}
-      <View className="flex-row items-center justify-between px-4 py-3 bg-white border-b border-cardBorder">
-        <Pressable
-          onPress={() => router.back()}
-          className="w-10 h-10 items-center justify-center rounded-full active:bg-surfaceContainer"
-        >
-          <AppIcon name="arrow_back" size={22} color={colors.onSurface} />
-        </Pressable>
-        <Text className="text-base font-bold text-onSurface">Phone OTP Verification</Text>
-        <BrandLogo variant="emblem" size={28} />
+      <View className="bg-white border-b border-cardBorder">
+        <View className="max-w-md mx-auto w-full flex-row items-center justify-between px-4 py-3">
+          <Pressable
+            onPress={() => router.back()}
+            className="w-10 h-10 items-center justify-center rounded-full active:bg-surfaceContainer"
+          >
+            <AppIcon name="arrow_back" size={22} color={colors.onSurface} />
+          </Pressable>
+          <Text className="text-base font-bold text-onSurface">Phone OTP Verification</Text>
+          <BrandLogo variant="emblem" size={28} />
+        </View>
       </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
+        contentContainerStyle={{ paddingHorizontal: horizontalPadding, paddingTop: 20, paddingBottom: 60 }}
       >
+        <View className="max-w-md mx-auto w-full">
         {/* Step Badge & Process Indicator */}
         <View className="mb-5">
           <View className="flex-row items-center justify-between mb-2">
@@ -692,7 +697,7 @@ export default function OtpVerifyScreen() {
                 maxLength={idx === 0 ? 6 : 1}
                 placeholder="•"
                 placeholderTextColor="#94a3b8"
-                className={`w-11 h-13 text-center text-xl font-bold rounded-xl border ${
+                className={`flex-1 h-13 max-w-[50px] min-w-[36px] text-center text-xl font-bold rounded-xl border ${
                   digit
                     ? 'border-primary bg-secondaryContainer/30 text-primary'
                     : 'border-cardBorder bg-surfaceContainerLow text-onSurface'
@@ -829,7 +834,8 @@ export default function OtpVerifyScreen() {
         >
           <Text className="text-xs font-medium text-onSurfaceVariant">Return to Previous Screen</Text>
         </Pressable>
-      </ScrollView>
-    </View>
-  );
+      </View>
+    </ScrollView>
+  </View>
+);
 }

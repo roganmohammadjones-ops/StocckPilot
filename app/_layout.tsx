@@ -52,6 +52,7 @@ export default function RootLayout() {
         <Stack.Screen name="explore-sellers" options={{ headerShown: false }} />
         <Stack.Screen name="reports" options={{ headerShown: false }} />
         <Stack.Screen name="settings" options={{ headerShown: false }} />
+        <Stack.Screen name="notifications" options={{ headerShown: false }} />
         <Stack.Screen name="setup-check" options={{ headerShown: true, title: 'Foundation Check' }} />
         <Stack.Screen name="+not-found" options={{ headerShown: true, title: 'Page not found' }} />
       </Stack>

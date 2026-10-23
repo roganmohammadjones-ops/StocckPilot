@@ -11,6 +11,7 @@ export interface ReceiptItem {
   quantity: number;
   unitPrice: number;
   totalPrice?: number;
+  priceTier?: 'retail' | 'wholesale' | 'distributor';
 }
 
 export interface StoreDetails {
@@ -79,6 +80,7 @@ export function generateReceiptHtml(
       <tr>
         <td style="padding: 6px 0; border-bottom: 1px dashed #d1d5db; font-size: 13px; font-weight: 600; color: #111827;">
           ${item.productName}
+          ${item.priceTier && item.priceTier !== 'retail' ? `<span style="display:inline-block; margin-left:4px; font-size:9px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; border-radius:3px; padding:0 3px; font-weight:700; text-transform:uppercase;">${item.priceTier}</span>` : ''}
           ${item.sku ? `<br/><span style="font-size: 10px; color: #6b7280; font-family: monospace;">SKU: ${item.sku}</span>` : ''}
         </td>
         <td style="padding: 6px 4px; border-bottom: 1px dashed #d1d5db; font-size: 13px; text-align: center; color: #374151;">

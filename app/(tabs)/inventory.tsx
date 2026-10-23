@@ -405,7 +405,7 @@ export default function InventoryScreen() {
                 </View>
 
                 {/* Financial Metrics 3-Col Grid */}
-                <View className="flex-row justify-between bg-surfaceContainerLow p-2.5 rounded-lg mb-2.5">
+                <View className="flex-row justify-between bg-surfaceContainerLow p-2.5 rounded-lg mb-2">
                   <View className="flex-1">
                     <Text className="text-[10px] text-onSurfaceVariant">Cost Price</Text>
                     <Text className="text-sm font-semibold text-onSurface mt-0.5">
@@ -425,6 +425,29 @@ export default function InventoryScreen() {
                         +₦{margin.toLocaleString()} (+{marginPct}%)
                       </Text>
                     </View>
+                  </View>
+                </View>
+
+                {/* 3-Tier Volume Pricing Strip */}
+                <View className="flex-row items-center justify-between bg-surfaceContainerLow/60 px-2 py-1.5 rounded-lg mb-2.5 border border-cardBorder">
+                  <View className="flex-row items-center gap-1">
+                    <View className="w-1.5 h-1.5 rounded-full bg-primary" />
+                    <Text className="text-[10px] text-onSurfaceVariant">Retail:</Text>
+                    <Text className="text-[11px] font-bold text-onSurface">₦{product.sellingPrice.toLocaleString()}</Text>
+                  </View>
+                  <View className="flex-row items-center gap-1">
+                    <View className="w-1.5 h-1.5 rounded-full bg-secondary" />
+                    <Text className="text-[10px] text-onSurfaceVariant">W/Sale:</Text>
+                    <Text className="text-[11px] font-bold text-onSurface">
+                      ₦{(product.wholesalePrice ?? Math.round(product.sellingPrice * 0.93)).toLocaleString()}
+                    </Text>
+                  </View>
+                  <View className="flex-row items-center gap-1">
+                    <View className="w-1.5 h-1.5 rounded-full bg-tertiary" />
+                    <Text className="text-[10px] text-onSurfaceVariant">Dist:</Text>
+                    <Text className="text-[11px] font-bold text-onSurface">
+                      ₦{(product.distributorPrice ?? Math.round(product.sellingPrice * 0.88)).toLocaleString()}
+                    </Text>
                   </View>
                 </View>
 

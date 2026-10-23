@@ -17,6 +17,7 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
       cost_price REAL NOT NULL,
       selling_price REAL NOT NULL,
       wholesale_price REAL,
+      distributor_price REAL,
       recent_note TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
@@ -61,6 +62,7 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
       quantity REAL NOT NULL,
       unit_price REAL NOT NULL,
       total_price REAL NOT NULL,
+      price_tier TEXT DEFAULT 'retail',
       FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE,
       FOREIGN KEY (product_id) REFERENCES products(id)
     );
@@ -98,6 +100,19 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
     );
   `);
 
+  // Migrations for existing databases
+  try {
+    await db.execAsync(`ALTER TABLE products ADD COLUMN distributor_price REAL;`);
+  } catch {
+    // column may already exist
+  }
+
+  try {
+    await db.execAsync(`ALTER TABLE sale_items ADD COLUMN price_tier TEXT DEFAULT 'retail';`);
+  } catch {
+    // column may already exist
+  }
+
   // Remove any legacy customer records/debtors and demo sales so users start with a clean ledger
   await db.execAsync(`
     DELETE FROM sale_items WHERE sale_id IN ('sale_1', 'sale_2', 'sale_3', 'sale_4') 
@@ -118,10 +133,10 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
 }
 
 async function seedInitialData(db: SQLiteDatabase): Promise<void> {
-  // 1. Seed Products
+  // 1. Seed Products with 3-Tier Nigerian wholesale & distributor pricing
   await db.runAsync(
-    `INSERT INTO products (id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, recent_note)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO products (id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, wholesale_price, distributor_price, recent_note)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       'prod_1',
       'Dangote Refined Sugar 50kg',
@@ -133,13 +148,15 @@ async function seedInitialData(db: SQLiteDatabase): Promise<void> {
       10,
       68000,
       74500,
+      72000,
+      70500,
       'Sold 18 yesterday',
     ]
   );
 
   await db.runAsync(
-    `INSERT INTO products (id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, recent_note)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO products (id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, wholesale_price, distributor_price, recent_note)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       'prod_2',
       'Golden Penny Semovita 10kg (Pack of 5)',
@@ -151,13 +168,15 @@ async function seedInitialData(db: SQLiteDatabase): Promise<void> {
       8,
       32000,
       36000,
+      34500,
+      33800,
       'Supplier: Flour Mills Nig',
     ]
   );
 
   await db.runAsync(
-    `INSERT INTO products (id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, recent_note)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO products (id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, wholesale_price, distributor_price, recent_note)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       'prod_3',
       'Peak Evaporated Milk 160g (Carton of 48)',
@@ -169,13 +188,15 @@ async function seedInitialData(db: SQLiteDatabase): Promise<void> {
       15,
       24500,
       28500,
+      27000,
+      26200,
       'Promo batch arriving Friday',
     ]
   );
 
   await db.runAsync(
-    `INSERT INTO products (id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, recent_note)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO products (id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, wholesale_price, distributor_price, recent_note)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       'prod_4',
       'Gino Tomato Paste 70g (Carton of 50)',
@@ -187,13 +208,15 @@ async function seedInitialData(db: SQLiteDatabase): Promise<void> {
       20,
       11000,
       13200,
+      12500,
+      12000,
       'Fast mover in morning',
     ]
   );
 
   await db.runAsync(
-    `INSERT INTO products (id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, recent_note)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO products (id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, wholesale_price, distributor_price, recent_note)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       'prod_5',
       'Indomie Instant Noodles Super Pack (Carton 40)',
@@ -205,13 +228,15 @@ async function seedInitialData(db: SQLiteDatabase): Promise<void> {
       15,
       16500,
       18800,
+      17800,
+      17200,
       'High turnover SKU',
     ]
   );
 
   await db.runAsync(
-    `INSERT INTO products (id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, recent_note)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO products (id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, wholesale_price, distributor_price, recent_note)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       'prod_6',
       'Kings Pure Vegetable Oil 25L',
@@ -223,6 +248,8 @@ async function seedInitialData(db: SQLiteDatabase): Promise<void> {
       5,
       48000,
       52500,
+      50500,
+      49500,
       'Devon King brand',
     ]
   );

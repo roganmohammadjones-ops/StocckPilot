@@ -253,16 +253,16 @@ export default function CustomersLedgerScreen() {
         <View className="w-full max-w-7xl mx-auto">
           {/* Debt Ledger Summary Panel */}
           <View className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm mb-4">
-          <View className="flex-row items-center justify-between mb-3">
-            <View className="flex-row items-center gap-1.5">
+          <View className="flex-row items-center justify-between gap-2 mb-3">
+            <View className="flex-row items-center gap-1.5 shrink min-w-0">
               <AppIcon name="warning" size={18} color={colors.error} />
-              <Text className="text-xs font-bold text-onSurfaceVariant uppercase tracking-wider">
+              <Text numberOfLines={1} className="text-xs font-bold text-onSurfaceVariant uppercase tracking-wider truncate">
                 Credit Ledger & Receivables
               </Text>
             </View>
-            <View className={`flex-row items-center gap-1 px-2.5 py-0.5 rounded-full ${overdueCustomers.length > 0 ? 'bg-errorContainer' : 'bg-secondaryContainer'}`}>
-              <View className={`w-1.5 h-1.5 rounded-full ${overdueCustomers.length > 0 ? 'bg-error' : 'bg-primary'}`} />
-              <Text className={`text-xs font-bold ${overdueCustomers.length > 0 ? 'text-onErrorContainer' : 'text-onSecondaryContainer'}`}>
+            <View className={`flex-row items-center gap-1 px-2.5 py-0.5 rounded-full shrink-0 ${overdueCustomers.length > 0 ? 'bg-errorContainer' : 'bg-secondaryContainer'}`}>
+              <View className={`w-1.5 h-1.5 rounded-full shrink-0 ${overdueCustomers.length > 0 ? 'bg-error' : 'bg-primary'}`} />
+              <Text numberOfLines={1} className={`text-xs font-bold ${overdueCustomers.length > 0 ? 'text-onErrorContainer' : 'text-onSecondaryContainer'}`}>
                 {overdueCustomers.length > 0 ? `High Risk: ${overdueCustomers.length} Overdue` : 'All Accounts Good'}
               </Text>
             </View>

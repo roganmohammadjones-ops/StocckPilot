@@ -20,11 +20,18 @@ import type { Product, Customer } from '@/lib/db/types';
 import { printReceipt, shareReceiptPdf } from '@/lib/receipt';
 import { useStoreProfile } from '@/lib/store-profile';
 import { BarcodeScannerModal } from '@/components/barcode-scanner-modal';
+import { useResponsive } from '@/hooks/use-responsive';
+
+export type PriceTier = 'retail' | 'wholesale' | 'distributor';
 
 interface CartItem {
   id: string;
   name: string;
   sku: string;
+  retailPrice: number;
+  wholesalePrice: number;
+  distributorPrice: number;
+  selectedTier: PriceTier;
   unitPrice: number;
   costPrice: number;
   quantity: number;
@@ -44,6 +51,7 @@ export default function NewSaleModal() {
   const db = useAppDb();
   const { triggerRefresh } = useDataRefresh();
   const store = useStoreProfile();
+  const { isWide } = useResponsive();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -108,6 +116,32 @@ export default function NewSaleModal() {
   const handleSelectCustomer = (cust: Customer) => {
     setSelectedCustomerId(cust.id);
     setPhoneNumber(cust.phone);
+
+    // Auto-align cart items if customer has negotiated wholesale or distributor tier
+    const custTier = (cust.tier || '').toLowerCase();
+    let defaultTier: PriceTier = 'retail';
+    if (custTier.includes('distributor')) {
+      defaultTier = 'distributor';
+    } else if (custTier.includes('wholesale') || custTier.includes('gold')) {
+      defaultTier = 'wholesale';
+    }
+
+    if (defaultTier !== 'retail') {
+      setCart((prev) =>
+        prev.map((item) => {
+          const unitPrice =
+            defaultTier === 'wholesale'
+              ? item.wholesalePrice
+              : item.distributorPrice;
+          return {
+            ...item,
+            selectedTier: defaultTier,
+            unitPrice,
+            profitPerUnit: Math.max(0, unitPrice - item.costPrice),
+          };
+        })
+      );
+    }
   };
 
   const updateQuantity = (id: string, delta: number) => {
@@ -124,7 +158,48 @@ export default function NewSaleModal() {
     );
   };
 
-  const addItemToCart = (prod: Product) => {
+  const setItemTier = (id: string, tier: PriceTier) => {
+    setCart((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        const unitPrice =
+          tier === 'retail'
+            ? item.retailPrice
+            : tier === 'wholesale'
+            ? item.wholesalePrice
+            : item.distributorPrice;
+        return {
+          ...item,
+          selectedTier: tier,
+          unitPrice,
+          profitPerUnit: Math.max(0, unitPrice - item.costPrice),
+        };
+      })
+    );
+  };
+
+  const addItemToCart = (prod: Product, targetTier?: PriceTier) => {
+    const retailPrice = prod.sellingPrice;
+    const wholesalePrice = prod.wholesalePrice || Math.round(prod.sellingPrice * 0.93);
+    const distributorPrice = prod.distributorPrice || Math.round(prod.sellingPrice * 0.88);
+
+    let initialTier: PriceTier = targetTier || 'retail';
+    if (!targetTier && customerType === 'registered' && selectedCustomer) {
+      const custTier = (selectedCustomer.tier || '').toLowerCase();
+      if (custTier.includes('distributor')) {
+        initialTier = 'distributor';
+      } else if (custTier.includes('wholesale') || custTier.includes('gold')) {
+        initialTier = 'wholesale';
+      }
+    }
+
+    const unitPrice =
+      initialTier === 'retail'
+        ? retailPrice
+        : initialTier === 'wholesale'
+        ? wholesalePrice
+        : distributorPrice;
+
     setCart((prev) => {
       const existing = prev.find((item) => item.id === prod.id || item.sku === prod.sku);
       if (existing) {
@@ -138,10 +213,14 @@ export default function NewSaleModal() {
           id: prod.id,
           name: prod.name,
           sku: prod.sku,
-          unitPrice: prod.sellingPrice,
+          retailPrice,
+          wholesalePrice,
+          distributorPrice,
+          selectedTier: initialTier,
+          unitPrice,
           costPrice: prod.costPrice,
           quantity: 1,
-          profitPerUnit: Math.max(0, prod.sellingPrice - prod.costPrice),
+          profitPerUnit: Math.max(0, unitPrice - prod.costPrice),
           icon: 'inventory_2',
           stockLeft: prod.stockLeft,
           stockUnit: prod.stockUnit,
@@ -205,6 +284,7 @@ export default function NewSaleModal() {
           sku: item.sku,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
+          priceTier: item.selectedTier,
         })),
       });
 
@@ -256,6 +336,7 @@ export default function NewSaleModal() {
           quantity: it.quantity,
           unitPrice: it.unitPrice,
           totalPrice: it.quantity * it.unitPrice,
+          priceTier: it.selectedTier,
         })),
         {
           businessName: store.businessName,
@@ -295,6 +376,7 @@ export default function NewSaleModal() {
           quantity: it.quantity,
           unitPrice: it.unitPrice,
           totalPrice: it.quantity * it.unitPrice,
+          priceTier: it.selectedTier,
         })),
         {
           businessName: store.businessName,
@@ -318,7 +400,7 @@ export default function NewSaleModal() {
       `*Store:* ${encodeURIComponent(store.businessName)}%0A` +
       `*Total Paid:* ₦${completedSale.netPayable.toLocaleString()}%0A` +
       `*Channel:* ${completedSale.paymentChannel.toUpperCase()}%0A` +
-      `*Items:* ${completedSale.items.map((c) => `${c.name} x${c.quantity}`).join(', ')}%0A` +
+      `*Items:* ${completedSale.items.map((c) => `${c.name} [${c.selectedTier.toUpperCase()}] x${c.quantity} @ ₦${c.unitPrice.toLocaleString()}`).join(', ')}%0A` +
       `Thank you for your patronage!`;
     Linking.openURL(`https://wa.me/${customerPhone}?text=${msg}`);
   };
@@ -342,31 +424,33 @@ export default function NewSaleModal() {
         style={{ paddingTop: Math.max(insets.top, 16) }}
         className="bg-white border-b border-cardBorder px-4 pb-3"
       >
-        <View className="w-12 h-1.5 bg-outlineVariant rounded-full self-center mb-2" />
-        <View className="flex-row items-center justify-between">
-          <View className="flex-1 mr-2">
-            <View className="flex-row items-center gap-1.5">
-              <AppIcon name="shopping_cart_checkout" size={20} color={colors.primary} />
-              <Text className="text-lg font-bold text-onSurface">New Sale Checkout</Text>
-            </View>
-            <View className="flex-row items-center gap-1.5 mt-0.5">
-              <View className="bg-surfaceContainer px-2 py-0.5 rounded">
-                <Text className="text-[11px] font-bold text-primary">POS Mode</Text>
+        <View className="w-full max-w-7xl mx-auto">
+          <View className="w-12 h-1.5 bg-outlineVariant rounded-full self-center mb-2" />
+          <View className="flex-row items-center justify-between">
+            <View className="flex-1 mr-2">
+              <View className="flex-row items-center gap-1.5">
+                <AppIcon name="shopping_cart_checkout" size={20} color={colors.primary} />
+                <Text className="text-lg font-bold text-onSurface">New Sale Checkout</Text>
               </View>
-              <Text className="text-xs text-outline">•</Text>
-              <Text className="text-xs text-onSurfaceVariant">Counter Till #1</Text>
-              <Text className="text-xs text-outline">•</Text>
-              <Text className="text-xs font-semibold text-secondary">
-                {cart.length} SKUs ({totalUnits} units)
-              </Text>
+              <View className="flex-row items-center gap-1.5 mt-0.5">
+                <View className="bg-surfaceContainer px-2 py-0.5 rounded">
+                  <Text className="text-[11px] font-bold text-primary">POS Mode</Text>
+                </View>
+                <Text className="text-xs text-outline">•</Text>
+                <Text className="text-xs text-onSurfaceVariant">Counter Till #1</Text>
+                <Text className="text-xs text-outline">•</Text>
+                <Text className="text-xs font-semibold text-secondary">
+                  {cart.length} SKUs ({totalUnits} units)
+                </Text>
+              </View>
             </View>
+            <Pressable
+              onPress={() => router.back()}
+              className="w-9 h-9 rounded-full bg-surfaceContainerLow items-center justify-center active:bg-surfaceContainer"
+            >
+              <AppIcon name="close" size={20} color={colors.onSurfaceVariant} />
+            </Pressable>
           </View>
-          <Pressable
-            onPress={() => router.back()}
-            className="w-9 h-9 rounded-full bg-surfaceContainerLow items-center justify-center active:bg-surfaceContainer"
-          >
-            <AppIcon name="close" size={20} color={colors.onSurfaceVariant} />
-          </Pressable>
         </View>
       </View>
 
@@ -374,9 +458,11 @@ export default function NewSaleModal() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40 }}
       >
-        {/* Scanned Cart Items */}
-        <View className="mb-4">
-          <View className="flex-row items-center justify-between mb-2">
+        <View className={`w-full max-w-7xl mx-auto ${isWide ? 'flex-row items-start gap-6' : ''}`}>
+          {/* Left Column: Scanned Cart */}
+          <View className={isWide ? 'flex-1' : 'w-full'}>
+            <View className="mb-4">
+              <View className="flex-row items-center justify-between mb-2">
             <Text className="text-xs font-bold text-onSurfaceVariant uppercase tracking-wider">
               Scanned Cart ({cart.length})
             </Text>
@@ -413,62 +499,192 @@ export default function NewSaleModal() {
             </View>
           ) : (
             <View className="gap-2.5">
-              {cart.map((item) => (
-                <View
-                  key={item.id}
-                  className="bg-white p-3 rounded-xl border border-cardBorder shadow-xs flex-row items-center justify-between"
-                >
-                  <View className="flex-row items-center gap-2.5 flex-1 mr-2">
-                    <View className="w-10 h-10 rounded-lg bg-surfaceContainerHighest items-center justify-center">
-                      <AppIcon name={item.icon} size={20} color={colors.primary} />
-                    </View>
-                    <View className="flex-1 min-w-0">
-                      <Text className="text-xs font-bold text-onSurface truncate">
-                        {item.name}
-                      </Text>
-                      <View className="flex-row items-center gap-1.5 mt-0.5">
-                        <Text className="text-[11px] text-onSurfaceVariant">
-                          ₦{item.unitPrice.toLocaleString()} / unit
-                        </Text>
-                        <Text className="text-[11px] text-outline">•</Text>
-                        <Text className="text-[10px] font-semibold text-primary">
-                          +₦{item.profitPerUnit.toLocaleString()} profit
+              {cart.map((item) => {
+                const lineTotal = item.unitPrice * item.quantity;
+                const lineProfit = item.profitPerUnit * item.quantity;
+                const showWholesaleIncentive = item.quantity >= 5 && item.selectedTier === 'retail';
+                const showDistributorIncentive = item.quantity >= 20 && item.selectedTier !== 'distributor';
+
+                return (
+                  <View
+                    key={item.id}
+                    className="bg-white p-3 rounded-2xl border border-cardBorder shadow-xs gap-2.5"
+                  >
+                    {/* Top Row: Item Details & Stepper */}
+                    <View className="flex-row items-center justify-between">
+                      <View className="flex-row items-center gap-2.5 flex-1 mr-2">
+                        <View className="w-10 h-10 rounded-xl bg-surfaceContainerHighest items-center justify-center">
+                          <AppIcon name={item.icon} size={20} color={colors.primary} />
+                        </View>
+                        <View className="flex-1 min-w-0">
+                          <Text className="text-xs font-bold text-onSurface truncate">
+                            {item.name}
+                          </Text>
+                          <View className="flex-row items-center gap-1.5 mt-0.5">
+                            <Text className="text-[11px] font-mono text-primary font-semibold">
+                              {item.sku}
+                            </Text>
+                            <Text className="text-[11px] text-outline">•</Text>
+                            <Text className="text-[11px] text-onSurfaceVariant">
+                              {item.stockLeft} {item.stockUnit} in store
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      {/* Quantity Stepper & Line Subtotal */}
+                      <View className="items-end gap-1">
+                        <View className="flex-row items-center bg-surfaceContainerLow rounded-lg border border-cardBorder p-0.5">
+                          <Pressable
+                            onPress={() => updateQuantity(item.id, -1)}
+                            className="w-7 h-7 rounded items-center justify-center active:bg-surfaceContainer"
+                          >
+                            <AppIcon
+                              name={item.quantity === 1 ? 'delete' : 'remove'}
+                              size={14}
+                              color={item.quantity === 1 ? colors.error : colors.onSurface}
+                            />
+                          </Pressable>
+                          <Text className="w-7 text-center text-xs font-bold text-onSurface">
+                            {item.quantity}
+                          </Text>
+                          <Pressable
+                            onPress={() => updateQuantity(item.id, 1)}
+                            className="w-7 h-7 rounded items-center justify-center active:bg-surfaceContainer"
+                          >
+                            <AppIcon name="add" size={14} color={colors.onSurface} />
+                          </Pressable>
+                        </View>
+                        <Text className="text-xs font-bold text-onSurface">
+                          ₦{lineTotal.toLocaleString()}
                         </Text>
                       </View>
                     </View>
-                  </View>
 
-                  {/* Quantity Stepper & Subtotal */}
-                  <View className="flex-row items-center gap-3">
-                    <View className="flex-row items-center bg-surfaceContainerLow rounded-lg border border-cardBorder p-0.5">
+                    {/* Middle Row: Tier Selector Pills */}
+                    <View className="flex-row items-center bg-surfaceContainerLow p-1 rounded-xl gap-1">
                       <Pressable
-                        onPress={() => updateQuantity(item.id, -1)}
-                        className="w-7 h-7 rounded items-center justify-center active:bg-surfaceContainer"
+                        onPress={() => setItemTier(item.id, 'retail')}
+                        className={`flex-1 py-1 px-1.5 rounded-lg items-center ${
+                          item.selectedTier === 'retail'
+                            ? 'bg-primary shadow-xs'
+                            : 'active:bg-surfaceContainer'
+                        }`}
                       >
-                        <AppIcon name="remove" size={14} color={colors.onSurface} />
+                        <Text
+                          className={`text-[10px] font-bold ${
+                            item.selectedTier === 'retail' ? 'text-white' : 'text-onSurfaceVariant'
+                          }`}
+                        >
+                          Retail
+                        </Text>
+                        <Text
+                          className={`text-[10px] ${
+                            item.selectedTier === 'retail' ? 'text-white/90 font-bold' : 'text-outline font-semibold'
+                          }`}
+                        >
+                          ₦{item.retailPrice.toLocaleString()}
+                        </Text>
                       </Pressable>
-                      <Text className="w-6 text-center text-xs font-bold text-onSurface">
-                        {item.quantity}
-                      </Text>
+
                       <Pressable
-                        onPress={() => updateQuantity(item.id, 1)}
-                        className="w-7 h-7 rounded items-center justify-center active:bg-surfaceContainer"
+                        onPress={() => setItemTier(item.id, 'wholesale')}
+                        className={`flex-1 py-1 px-1.5 rounded-lg items-center ${
+                          item.selectedTier === 'wholesale'
+                            ? 'bg-secondary shadow-xs'
+                            : 'active:bg-surfaceContainer'
+                        }`}
                       >
-                        <AppIcon name="add" size={14} color={colors.onSurface} />
+                        <Text
+                          className={`text-[10px] font-bold ${
+                            item.selectedTier === 'wholesale' ? 'text-white' : 'text-onSurfaceVariant'
+                          }`}
+                        >
+                          W/Sale (≥5)
+                        </Text>
+                        <Text
+                          className={`text-[10px] ${
+                            item.selectedTier === 'wholesale' ? 'text-white/90 font-bold' : 'text-outline font-semibold'
+                          }`}
+                        >
+                          ₦{item.wholesalePrice.toLocaleString()}
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        onPress={() => setItemTier(item.id, 'distributor')}
+                        className={`flex-1 py-1 px-1.5 rounded-lg items-center ${
+                          item.selectedTier === 'distributor'
+                            ? 'bg-tertiary shadow-xs'
+                            : 'active:bg-surfaceContainer'
+                        }`}
+                      >
+                        <Text
+                          className={`text-[10px] font-bold ${
+                            item.selectedTier === 'distributor' ? 'text-white' : 'text-onSurfaceVariant'
+                          }`}
+                        >
+                          Distributor (≥20)
+                        </Text>
+                        <Text
+                          className={`text-[10px] ${
+                            item.selectedTier === 'distributor' ? 'text-white/90 font-bold' : 'text-outline font-semibold'
+                          }`}
+                        >
+                          ₦{item.distributorPrice.toLocaleString()}
+                        </Text>
                       </Pressable>
                     </View>
-                    <Text className="text-xs font-bold text-onSurface min-w-[65px] text-right">
-                      ₦{(item.unitPrice * item.quantity).toLocaleString()}
-                    </Text>
+
+                    {/* Bottom Row: Profit per Unit & Volume Incentive Notice */}
+                    <View className="flex-row items-center justify-between pt-0.5">
+                      <View className="flex-row items-center gap-1">
+                        <AppIcon name="trending_up" size={13} color={colors.primary} />
+                        <Text className="text-[10px] font-semibold text-primary">
+                          +₦{lineProfit.toLocaleString()} margin (+₦{item.profitPerUnit.toLocaleString()}/unit)
+                        </Text>
+                      </View>
+
+                      {showDistributorIncentive ? (
+                        <Pressable
+                          onPress={() => setItemTier(item.id, 'distributor')}
+                          className="flex-row items-center gap-1 bg-tertiaryContainer/70 px-2 py-0.5 rounded-full active:bg-tertiaryContainer"
+                        >
+                          <AppIcon name="stars" size={12} color={colors.tertiary} />
+                          <Text className="text-[10px] font-bold text-onTertiaryContainer">
+                            Eligible: Apply Distributor Rate
+                          </Text>
+                        </Pressable>
+                      ) : showWholesaleIncentive ? (
+                        <Pressable
+                          onPress={() => setItemTier(item.id, 'wholesale')}
+                          className="flex-row items-center gap-1 bg-secondaryContainer px-2 py-0.5 rounded-full active:bg-secondaryContainer/80"
+                        >
+                          <AppIcon name="local_offer" size={12} color={colors.secondary} />
+                          <Text className="text-[10px] font-bold text-onSecondaryContainer">
+                            Qty ≥ 5: Apply Wholesale Rate
+                          </Text>
+                        </Pressable>
+                      ) : (
+                        <View className="bg-surfaceContainerLow px-2 py-0.5 rounded">
+                          <Text className="text-[10px] text-onSurfaceVariant">
+                            Tier: <Text className="font-bold uppercase text-onSurface">{item.selectedTier}</Text>
+                          </Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
           )}
-        </View>
+            </View>
+          </View>
 
-        {/* Customer Segment Selector */}
-        <View className="mb-4">
+          {/* Right Column: Customer & Checkout */}
+          <View className={isWide ? 'w-96 lg:w-[420px]' : 'w-full'}>
+            {/* Customer Segment Selector */}
+            <View className="mb-4">
           <View className="flex-row bg-surfaceContainerLow p-1 rounded-xl mb-2">
             <Pressable
               onPress={() => setCustomerType('walkin')}
@@ -713,6 +929,8 @@ export default function NewSaleModal() {
             Offline Ledger Guaranteed • Instantly committed to Idumota node
           </Text>
         </View>
+          </View>
+        </View>
       </ScrollView>
 
       {/* Add SKU Modal */}
@@ -722,8 +940,10 @@ export default function NewSaleModal() {
         animationType="slide"
         onRequestClose={() => setShowAddSkuModal(false)}
       >
-        <View className="flex-1 bg-black/50 justify-end">
-          <View className="bg-white rounded-t-3xl p-5 border-t border-cardBorder max-h-[85%]">
+        <View className={`flex-1 bg-black/50 ${isWide ? 'justify-center items-center p-4' : 'justify-end'}`}>
+          <View className={`bg-white p-5 border border-cardBorder shadow-2xl ${
+            isWide ? 'w-full max-w-lg rounded-3xl max-h-[85%]' : 'rounded-t-3xl max-h-[85%]'
+          }`}>
             <View className="w-12 h-1 bg-outlineVariant rounded-full self-center mb-3" />
 
             <View className="flex-row items-center justify-between mb-3">
@@ -756,40 +976,85 @@ export default function NewSaleModal() {
             </View>
 
             {/* Product List */}
-            <ScrollView showsVerticalScrollIndicator={false} className="gap-2 mb-4">
-              {filteredCatalog.map((prod) => (
-                <View
-                  key={prod.id}
-                  className="p-3 rounded-xl border border-cardBorder bg-surfaceContainerLow flex-row items-center justify-between"
-                >
-                  <View className="flex-1 mr-2">
-                    <Text className="text-xs font-bold text-onSurface">{prod.name}</Text>
-                    <View className="flex-row items-center gap-1.5 mt-0.5">
-                      <Text className="text-[11px] font-mono text-primary font-bold">
-                        {prod.sku}
-                      </Text>
-                      <Text className="text-xs text-outline">•</Text>
-                      <Text className="text-[11px] text-onSurfaceVariant">
-                        {prod.stockLeft} {prod.stockUnit} left
-                      </Text>
+            <ScrollView showsVerticalScrollIndicator={false} className="gap-2.5 mb-4">
+              {filteredCatalog.map((prod) => {
+                const wPrice = prod.wholesalePrice || Math.round(prod.sellingPrice * 0.93);
+                const dPrice = prod.distributorPrice || Math.round(prod.sellingPrice * 0.88);
+
+                return (
+                  <View
+                    key={prod.id}
+                    className="p-3 rounded-2xl border border-cardBorder bg-surfaceContainerLow gap-2"
+                  >
+                    <View className="flex-row items-center justify-between">
+                      <View className="flex-1 mr-2">
+                        <Text className="text-xs font-bold text-onSurface">{prod.name}</Text>
+                        <View className="flex-row items-center gap-1.5 mt-0.5">
+                          <Text className="text-[11px] font-mono text-primary font-bold">
+                            {prod.sku}
+                          </Text>
+                          <Text className="text-xs text-outline">•</Text>
+                          <Text className="text-[11px] text-onSurfaceVariant">
+                            {prod.stockLeft} {prod.stockUnit} left
+                          </Text>
+                        </View>
+                      </View>
+                      <Pressable
+                        onPress={() => {
+                          addItemToCart(prod);
+                          setShowAddSkuModal(false);
+                        }}
+                        className="px-3.5 py-1.5 bg-primary rounded-xl active:bg-primaryContainer flex-row items-center gap-1 shadow-xs"
+                      >
+                        <AppIcon name="add" size={14} color="#ffffff" />
+                        <Text className="text-xs font-bold text-white">Add</Text>
+                      </Pressable>
+                    </View>
+
+                    {/* Tiered Price Quick-Add Selector Pills */}
+                    <View className="flex-row items-center gap-1.5 pt-0.5">
+                      <Pressable
+                        onPress={() => {
+                          addItemToCart(prod, 'retail');
+                          setShowAddSkuModal(false);
+                        }}
+                        className="flex-1 bg-white p-1 rounded-lg border border-cardBorder items-center active:bg-surfaceContainer"
+                      >
+                        <Text className="text-[9px] font-semibold text-onSurfaceVariant">Retail</Text>
+                        <Text className="text-[10px] font-bold text-primary">
+                          ₦{prod.sellingPrice.toLocaleString()}
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        onPress={() => {
+                          addItemToCart(prod, 'wholesale');
+                          setShowAddSkuModal(false);
+                        }}
+                        className="flex-1 bg-white p-1 rounded-lg border border-cardBorder items-center active:bg-surfaceContainer"
+                      >
+                        <Text className="text-[9px] font-semibold text-onSurfaceVariant">W/Sale (≥5)</Text>
+                        <Text className="text-[10px] font-bold text-secondary">
+                          ₦{wPrice.toLocaleString()}
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        onPress={() => {
+                          addItemToCart(prod, 'distributor');
+                          setShowAddSkuModal(false);
+                        }}
+                        className="flex-1 bg-white p-1 rounded-lg border border-cardBorder items-center active:bg-surfaceContainer"
+                      >
+                        <Text className="text-[9px] font-semibold text-onSurfaceVariant">Dist (≥20)</Text>
+                        <Text className="text-[10px] font-bold text-tertiary">
+                          ₦{dPrice.toLocaleString()}
+                        </Text>
+                      </Pressable>
                     </View>
                   </View>
-                  <View className="items-end gap-1">
-                    <Text className="text-xs font-bold text-onSurface">
-                      ₦{prod.sellingPrice.toLocaleString()}
-                    </Text>
-                    <Pressable
-                      onPress={() => {
-                        addItemToCart(prod);
-                        setShowAddSkuModal(false);
-                      }}
-                      className="px-3 py-1 bg-primary rounded-lg active:bg-primaryContainer"
-                    >
-                      <Text className="text-[11px] font-bold text-white">+ Add</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              ))}
+                );
+              })}
             </ScrollView>
           </View>
         </View>
@@ -814,8 +1079,10 @@ export default function NewSaleModal() {
         transparent
         onRequestClose={() => setCompletedSale(null)}
       >
-        <View className="flex-1 bg-black/60 justify-end">
-          <View className="bg-white rounded-t-3xl max-h-[85%] p-5 border-t border-cardBorder shadow-2xl">
+        <View className={`flex-1 bg-black/60 ${isWide ? 'justify-center items-center p-4' : 'justify-end'}`}>
+          <View className={`bg-white p-5 border border-cardBorder shadow-2xl ${
+            isWide ? 'w-full max-w-lg rounded-3xl max-h-[85%]' : 'rounded-t-3xl max-h-[85%]'
+          }`}>
             {/* Success Celebration Header */}
             <View className="items-center text-center pb-4 border-b border-cardBorder mb-4">
               <View className="w-16 h-16 rounded-full bg-secondaryContainer items-center justify-center mb-2 shadow-sm">

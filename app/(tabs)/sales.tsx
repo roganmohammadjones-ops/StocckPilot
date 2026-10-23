@@ -210,19 +210,33 @@ export default function SalesRegisterScreen() {
             <View className={isWide ? 'w-[400px] lg:w-[440px]' : 'w-full'}>
               {/* 1. Daily Sales Summary Banner */}
               <View className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm mb-4">
-          <View className="flex-row items-center justify-between mb-3">
-            <View className="flex-row items-center gap-1.5">
-              <AppIcon name="analytics" size={20} color={colors.primary} />
-              <Text className="text-base font-bold text-onSurface">Daily Register Pulse</Text>
+          <View className="flex-row items-center justify-between gap-2 mb-3">
+            <View className="flex-row items-center gap-1.5 shrink min-w-0">
+              <AppIcon name="analytics" size={19} color={colors.primary} />
+              <Text numberOfLines={1} className="text-base font-bold text-onSurface truncate">
+                Daily Register Pulse
+              </Text>
             </View>
             <Pressable
               onPress={handleOpenShiftModal}
-              className="flex-row items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondaryContainer/80 border border-secondary active:opacity-70"
+              accessibilityRole="button"
+              accessibilityLabel={`Current shift: ${currentShift?.cashierName || 'Attendant'}. Tap to reconcile shift.`}
+              className="flex-row items-center gap-1 px-2.5 py-1 rounded-full bg-secondaryContainer/80 border border-secondary active:opacity-70 shrink min-w-0 max-w-[50%]"
             >
-              <View className="w-2 h-2 rounded-full bg-primary" />
+              <View className="w-2 h-2 rounded-full bg-primary shrink-0" />
               <AppIcon name="lock_clock" size={13} color={colors.onSecondaryContainer} />
-              <Text className="text-xs font-bold text-onSecondaryContainer">
-                {currentShift?.cashierName ? `${currentShift.cashierName} • Shift Open` : 'Shift Open'}
+              <Text
+                numberOfLines={1}
+                ellipsizeMode="tail"
+                className="text-xs font-bold text-onSecondaryContainer shrink truncate"
+              >
+                {isWide
+                  ? currentShift?.cashierName
+                    ? `${currentShift.cashierName} • Shift Open`
+                    : 'Shift Open'
+                  : currentShift?.cashierName
+                  ? `${currentShift.cashierName.replace('Attendant ', '')} • Open`
+                  : 'Shift Open'}
               </Text>
               <AppIcon name="expand_more" size={14} color={colors.onSecondaryContainer} />
             </Pressable>
@@ -460,33 +474,33 @@ export default function SalesRegisterScreen() {
                   className="bg-white rounded-xl p-3.5 border border-cardBorder shadow-sm"
                 >
                   <View className="flex-row items-start justify-between mb-2">
-                    <View className="flex-row items-center gap-2.5 flex-1 mr-2">
-                      <View className="w-10 h-10 rounded-lg bg-surfaceContainer items-center justify-center">
+                    <View className="flex-row items-center gap-2.5 flex-1 mr-2 min-w-0">
+                      <View className="w-10 h-10 rounded-lg bg-surfaceContainer items-center justify-center shrink-0">
                         <AppIcon name="person" size={20} color={colors.onSurfaceVariant} />
                       </View>
                       <View className="flex-1 min-w-0">
-                        <View className="flex-row items-center gap-1.5">
-                        <Text className="text-sm font-bold text-onSurface truncate">
-                          {tx.customerName || 'Walk-in Cash Customer'}
-                        </Text>
-                        <View
-                          className={`px-1.5 py-0.2 rounded-full ${
-                            tx.paymentChannel === 'credit'
-                              ? 'bg-errorContainer'
-                              : 'bg-secondaryContainer'
-                          }`}
-                        >
-                          <Text
-                            className={`text-[10px] font-bold ${
+                        <View className="flex-row items-center gap-1.5 flex-wrap">
+                          <Text numberOfLines={1} className="text-sm font-bold text-onSurface shrink truncate">
+                            {tx.customerName || 'Walk-in Cash Customer'}
+                          </Text>
+                          <View
+                            className={`px-1.5 py-0.2 rounded-full shrink-0 ${
                               tx.paymentChannel === 'credit'
-                                ? 'text-onErrorContainer'
-                                : 'text-onSecondaryContainer'
+                                ? 'bg-errorContainer'
+                                : 'bg-secondaryContainer'
                             }`}
                           >
-                            {tx.paymentChannel === 'credit' ? 'Credit (IOU)' : 'Completed'}
-                          </Text>
+                            <Text
+                              className={`text-[10px] font-bold ${
+                                tx.paymentChannel === 'credit'
+                                  ? 'text-onErrorContainer'
+                                  : 'text-onSecondaryContainer'
+                              }`}
+                            >
+                              {tx.paymentChannel === 'credit' ? 'Credit (IOU)' : 'Completed'}
+                            </Text>
+                          </View>
                         </View>
-                      </View>
                       <View className="flex-row items-center gap-1 mt-0.5">
                         <Text className="text-xs font-bold text-primary">#{tx.invoiceNo}</Text>
                         <Text className="text-xs text-outline">•</Text>

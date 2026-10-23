@@ -7,6 +7,7 @@ import { BrandLogo } from './brand-logo';
 import { useResponsive } from '@/hooks/use-responsive';
 import { colors } from '@/lib/theme';
 import { useStoreProfile } from '@/lib/store-profile';
+import { useNotifications } from '@/lib/notifications';
 
 interface AppHeaderProps {
   title?: string;
@@ -18,6 +19,7 @@ export function AppHeader({ title, subtitle, showBack = false }: AppHeaderProps)
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const store = useStoreProfile();
+  const { unreadCount } = useNotifications();
   const { isCompactPhone, isWide, horizontalPadding } = useResponsive();
 
   const businessNameMaxW = isCompactPhone
@@ -108,13 +110,18 @@ export function AppHeader({ title, subtitle, showBack = false }: AppHeaderProps)
           {/* Notifications Trigger */}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Notifications"
+            accessibilityLabel={`Notifications, ${unreadCount} unread`}
+            onPress={() => router.push('/notifications' as any)}
             className="w-9 h-9 items-center justify-center relative active:opacity-75"
           >
             <AppIcon name="notifications" size={22} color={colors.onSurfaceVariant} />
-            <View className="absolute top-1 right-1 w-4 h-4 rounded-full bg-error items-center justify-center">
-              <Text className="text-[10px] font-bold text-white">3</Text>
-            </View>
+            {unreadCount > 0 && (
+              <View className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-error items-center justify-center">
+                <Text className="text-[10px] font-bold text-white leading-none">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Text>
+              </View>
+            )}
           </Pressable>
 
           {/* Profile Avatar */}

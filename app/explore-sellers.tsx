@@ -17,6 +17,7 @@ import { useDataRefresh, useAppDb } from '@/lib/db/provider';
 import { getProducts, updateProductStock } from '@/lib/db/queries';
 import type { Product } from '@/lib/db/types';
 import { useStoreProfile } from '@/lib/store-profile';
+import { useResponsive } from '@/hooks/use-responsive';
 
 interface SellerStall {
   id: string;
@@ -83,6 +84,7 @@ export default function ExploreSellersScreen() {
   const db = useAppDb();
   const { triggerRefresh } = useDataRefresh();
   const store = useStoreProfile();
+  const { isWide } = useResponsive();
 
   const [search, setSearch] = useState('');
   const [selectedMarket, setSelectedMarket] = useState('All Markets');
@@ -186,7 +188,8 @@ export default function ExploreSellersScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40 }}
       >
-        {/* Value Proposition & Warm Welcome Banner */}
+        <View className="w-full max-w-7xl mx-auto">
+          {/* Value Proposition & Warm Welcome Banner */}
         <View className="bg-surfaceContainerHigh rounded-2xl p-4 shadow-sm mb-4">
           <View className="self-start flex-row items-center gap-1.5 bg-secondaryContainer px-2.5 py-1 rounded-full mb-2">
             <AppIcon name="verified" size={14} color={colors.onSecondaryContainer} />
@@ -262,11 +265,13 @@ export default function ExploreSellersScreen() {
             Featured Open Stalls (Live Stock Feed)
           </Text>
 
-          <View className="gap-3.5">
+          <View className={isWide ? 'flex-row flex-wrap justify-between gap-y-4' : 'gap-3.5'}>
             {filteredSellers.map((seller) => (
               <View
                 key={seller.id}
-                className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm gap-3"
+                className={`bg-white rounded-xl p-4 border border-cardBorder shadow-sm gap-3 ${
+                  isWide ? 'w-[49%]' : 'w-full'
+                }`}
               >
                 <View className="flex-row items-start justify-between">
                   <View className="flex-row items-start gap-2.5 flex-1 mr-2">
@@ -354,6 +359,7 @@ export default function ExploreSellersScreen() {
             ))}
           </View>
         </View>
+        </View>
       </ScrollView>
 
       {/* Reorder / Inwarding Modal */}
@@ -363,9 +369,19 @@ export default function ExploreSellersScreen() {
         animationType="slide"
         onRequestClose={() => setActiveSeller(null)}
       >
-        <View className="flex-1 bg-black/50 justify-end">
-          <View className="bg-white rounded-t-3xl p-5 border-t border-cardBorder max-h-[85%]">
-            <View className="w-12 h-1 bg-outlineVariant rounded-full self-center mb-3" />
+        <View
+          className={`flex-1 bg-black/50 ${
+            isWide ? 'justify-center items-center p-4' : 'justify-end'
+          }`}
+        >
+          <View
+            className={`bg-white p-5 border border-cardBorder shadow-2xl ${
+              isWide ? 'w-full max-w-lg rounded-3xl max-h-[85%]' : 'rounded-t-3xl max-h-[85%]'
+            }`}
+          >
+            {!isWide && (
+              <View className="w-12 h-1 bg-outlineVariant rounded-full self-center mb-3" />
+            )}
 
             <View className="flex-row items-center justify-between mb-3">
               <View>

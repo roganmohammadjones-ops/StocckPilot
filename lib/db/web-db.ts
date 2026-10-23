@@ -18,6 +18,7 @@ interface ProductRecord {
   cost_price: number;
   selling_price: number;
   wholesale_price: number | null;
+  distributor_price?: number | null;
   recent_note: string | null;
   created_at: string;
 }
@@ -61,6 +62,7 @@ interface SaleItemRecord {
   quantity: number;
   unit_price: number;
   total_price: number;
+  price_tier?: string | null;
 }
 
 interface ExpenseRecordRow {
@@ -121,6 +123,7 @@ function getSeedData(): WebStoreData {
         cost_price: 68000,
         selling_price: 74500,
         wholesale_price: 72000,
+        distributor_price: 70500,
         recent_note: 'Sold 18 yesterday',
         created_at: '2026-10-18T08:00:00Z',
       },
@@ -136,6 +139,7 @@ function getSeedData(): WebStoreData {
         cost_price: 32000,
         selling_price: 36000,
         wholesale_price: 34500,
+        distributor_price: 33800,
         recent_note: 'Supplier: Flour Mills Nig',
         created_at: '2026-10-18T09:00:00Z',
       },
@@ -151,6 +155,7 @@ function getSeedData(): WebStoreData {
         cost_price: 24500,
         selling_price: 28500,
         wholesale_price: 27000,
+        distributor_price: 26200,
         recent_note: 'Promo batch arriving Friday',
         created_at: '2026-10-18T10:00:00Z',
       },
@@ -166,6 +171,7 @@ function getSeedData(): WebStoreData {
         cost_price: 11000,
         selling_price: 13200,
         wholesale_price: 12500,
+        distributor_price: 12000,
         recent_note: 'Fast mover in morning',
         created_at: '2026-10-18T11:00:00Z',
       },
@@ -181,6 +187,7 @@ function getSeedData(): WebStoreData {
         cost_price: 16500,
         selling_price: 18800,
         wholesale_price: 17800,
+        distributor_price: 17200,
         recent_note: 'High turnover SKU',
         created_at: '2026-10-18T12:00:00Z',
       },
@@ -196,6 +203,7 @@ function getSeedData(): WebStoreData {
         cost_price: 48000,
         selling_price: 52500,
         wholesale_price: 50500,
+        distributor_price: 49500,
         recent_note: 'Devon King brand',
         created_at: '2026-10-18T13:00:00Z',
       },
@@ -363,7 +371,16 @@ class WebDatabaseImpl implements AppDatabase {
 
     // 1. INSERT INTO products
     if (s.startsWith('INSERT INTO products') || s.startsWith('INSERT OR REPLACE INTO products')) {
-      const [id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, wholesale_price, recent_note] = params;
+      let id: string, name: string, sku: string, category: string, category_slug: string;
+      let stock_left: any, stock_unit: any, min_alert: any, cost_price: any, selling_price: any;
+      let wholesale_price: any = null, distributor_price: any = null, recent_note: any = null;
+
+      if (params.length >= 13) {
+        [id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, wholesale_price, distributor_price, recent_note] = params;
+      } else {
+        [id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, wholesale_price, recent_note] = params;
+      }
+
       this.data.products = this.data.products.filter(p => p.id !== id && p.sku !== sku);
       this.data.products.unshift({
         id,
@@ -377,6 +394,7 @@ class WebDatabaseImpl implements AppDatabase {
         cost_price: Number(cost_price),
         selling_price: Number(selling_price),
         wholesale_price: wholesale_price != null ? Number(wholesale_price) : null,
+        distributor_price: distributor_price != null ? Number(distributor_price) : null,
         recent_note: recent_note || null,
         created_at: new Date().toISOString(),
       });
@@ -472,7 +490,7 @@ class WebDatabaseImpl implements AppDatabase {
 
     // 6. INSERT INTO sale_items
     if (s.startsWith('INSERT INTO sale_items')) {
-      const [id, sale_id, product_id, product_name, sku, quantity, unit_price, total_price] = params;
+      const [id, sale_id, product_id, product_name, sku, quantity, unit_price, total_price, price_tier] = params;
       this.data.saleItems.push({
         id,
         sale_id,
@@ -482,6 +500,7 @@ class WebDatabaseImpl implements AppDatabase {
         quantity: Number(quantity),
         unit_price: Number(unit_price),
         total_price: Number(total_price),
+        price_tier: price_tier || 'retail',
       });
       this.saveStore();
       return { changes: 1, lastInsertRowId: Date.now() };

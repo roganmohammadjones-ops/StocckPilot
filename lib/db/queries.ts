@@ -49,6 +49,7 @@ export async function getProducts(
     cost_price: number;
     selling_price: number;
     wholesale_price: number | null;
+    distributor_price: number | null;
     recent_note: string | null;
     created_at: string;
   }
@@ -75,6 +76,7 @@ export async function getProducts(
       costPrice: r.cost_price,
       sellingPrice: r.selling_price,
       wholesalePrice: r.wholesale_price ?? undefined,
+      distributorPrice: r.distributor_price ?? undefined,
       recentNote: r.recent_note ?? undefined,
       status,
       createdAt: r.created_at,
@@ -95,14 +97,15 @@ export async function addProduct(
     costPrice: number;
     sellingPrice: number;
     wholesalePrice?: number;
+    distributorPrice?: number;
     recentNote?: string;
   }
 ): Promise<string> {
   const id = `prod_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
   await db.runAsync(
-    `INSERT INTO products (id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, wholesale_price, recent_note)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO products (id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, wholesale_price, distributor_price, recent_note)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       product.name,
@@ -115,6 +118,7 @@ export async function addProduct(
       product.costPrice,
       product.sellingPrice,
       product.wholesalePrice ?? null,
+      product.distributorPrice ?? null,
       product.recentNote ?? null,
     ]
   );
@@ -147,12 +151,13 @@ export async function upsertProduct(
     costPrice: number;
     sellingPrice: number;
     wholesalePrice?: number;
+    distributorPrice?: number;
     recentNote?: string;
   }
 ): Promise<void> {
   await db.runAsync(
-    `INSERT INTO products (id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, wholesale_price, recent_note)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO products (id, name, sku, category, category_slug, stock_left, stock_unit, min_alert, cost_price, selling_price, wholesale_price, distributor_price, recent_note)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        name = excluded.name,
        sku = excluded.sku,
@@ -164,6 +169,7 @@ export async function upsertProduct(
        cost_price = excluded.cost_price,
        selling_price = excluded.selling_price,
        wholesale_price = excluded.wholesale_price,
+       distributor_price = excluded.distributor_price,
        recent_note = excluded.recent_note`,
     [
       product.id,
@@ -177,6 +183,7 @@ export async function upsertProduct(
       product.costPrice,
       product.sellingPrice,
       product.wholesalePrice ?? null,
+      product.distributorPrice ?? null,
       product.recentNote ?? null,
     ]
   );
@@ -446,6 +453,7 @@ export interface SaleItemRecord {
   quantity: number;
   unitPrice: number;
   totalPrice: number;
+  priceTier?: 'retail' | 'wholesale' | 'distributor';
 }
 
 export async function getSaleItems(
@@ -461,6 +469,7 @@ export async function getSaleItems(
     quantity: number;
     unit_price: number;
     total_price: number;
+    price_tier?: 'retail' | 'wholesale' | 'distributor' | null;
   }
   const query = `
     SELECT * FROM sale_items
@@ -477,6 +486,7 @@ export async function getSaleItems(
     quantity: r.quantity,
     unitPrice: r.unit_price,
     totalPrice: r.total_price,
+    priceTier: (r.price_tier as any) || 'retail',
   }));
 }
 
@@ -511,8 +521,8 @@ export async function createSale(
       const totalPrice = item.quantity * item.unitPrice;
 
       await db.runAsync(
-        `INSERT INTO sale_items (id, sale_id, product_id, product_name, sku, quantity, unit_price, total_price)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO sale_items (id, sale_id, product_id, product_name, sku, quantity, unit_price, total_price, price_tier)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           itemId,
           saleId,
@@ -522,6 +532,7 @@ export async function createSale(
           item.quantity,
           item.unitPrice,
           totalPrice,
+          item.priceTier ?? 'retail',
         ]
       );
 

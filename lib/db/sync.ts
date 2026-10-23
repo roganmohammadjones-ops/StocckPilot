@@ -109,6 +109,8 @@ export async function syncDatabaseWithCloud(db: SQLiteDatabase): Promise<SyncRes
                 sellingPrice: typeof rp.selling_price === 'number' ? rp.selling_price : 0,
                 wholesalePrice:
                   typeof rp.wholesale_price === 'number' ? rp.wholesale_price : undefined,
+                distributorPrice:
+                  typeof rp.distributor_price === 'number' ? rp.distributor_price : undefined,
                 recentNote: rp.recent_note || undefined,
               });
               counts.pulledProducts++;

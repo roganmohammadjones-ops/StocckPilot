@@ -8,7 +8,7 @@ import { colors } from '@/lib/theme';
 import { useDataRefresh, useAppDb } from '@/lib/db/provider';
 import { getStoredUser, logout } from '@/lib/auth';
 import { useStoreProfile } from '@/lib/store-profile';
-
+import { useNotifications } from '@/lib/notifications';
 import { useResponsive } from '@/hooks/use-responsive';
 
 interface MenuItem {
@@ -30,6 +30,7 @@ export default function MoreHubScreen() {
   const db = useAppDb();
   const { dataVersion } = useDataRefresh();
   const store = useStoreProfile();
+  const { unreadCount } = useNotifications();
   const { isWide, horizontalPadding } = useResponsive();
   const [productCount, setProductCount] = useState(0);
   const [customerCount, setCustomerCount] = useState(0);
@@ -60,6 +61,14 @@ export default function MoreHubScreen() {
     {
       title: 'Operations & Sourcing',
       items: [
+        {
+          title: 'Notifications & Alerts',
+          description: 'Low stock thresholds, overdue debtor reminders & system notices',
+          icon: 'notifications',
+          iconColor: colors.primary,
+          route: '/notifications',
+          badge: unreadCount > 0 ? `${unreadCount} New` : undefined,
+        },
         {
           title: 'Explore Market Sellers',
           description: 'Direct trade link with Idumota, Trade Fair & Kano stalls',

@@ -446,22 +446,22 @@ export default function HomeDashboardScreen() {
           {lowStockProducts.length > 0 ? (
             <View className="bg-white p-3.5 rounded-xl border border-cardBorder shadow-sm mb-3 relative overflow-hidden">
               <View className="absolute left-0 top-0 bottom-0 w-1 bg-secondary" />
-              <View className="flex-row items-start justify-between mb-2">
-                <View className="flex-row items-start gap-2">
-                  <View className="w-8 h-8 rounded-lg bg-secondaryContainer/60 items-center justify-center">
+              <View className="flex-row items-start justify-between gap-2 mb-2">
+                <View className="flex-row items-start gap-2 flex-1 mr-2 min-w-0">
+                  <View className="w-8 h-8 rounded-lg bg-secondaryContainer/60 items-center justify-center shrink-0">
                     <AppIcon name="inventory_2" size={18} color={colors.secondary} />
                   </View>
-                  <View>
-                    <Text className="text-sm font-bold text-onSurface">
+                  <View className="flex-1 min-w-0">
+                    <Text numberOfLines={1} className="text-sm font-bold text-onSurface truncate">
                       {lowStockProducts.length} Low-Stock Alert
                       {lowStockProducts.length > 1 ? 's' : ''}
                     </Text>
-                    <Text className="text-xs text-onSurfaceVariant">
+                    <Text numberOfLines={1} className="text-xs text-onSurfaceVariant truncate">
                       Reorder threshold reached for market staples
                     </Text>
                   </View>
                 </View>
-                <View className="px-2 py-0.5 rounded bg-secondaryContainer">
+                <View className="px-2 py-0.5 rounded bg-secondaryContainer shrink-0">
                   <Text className="text-[10px] font-bold text-onSecondaryContainer uppercase">
                     Low
                   </Text>
@@ -489,12 +489,12 @@ export default function HomeDashboardScreen() {
             </View>
           ) : (
             <View className="bg-white p-3.5 rounded-xl border border-cardBorder shadow-sm mb-3 flex-row items-center gap-3">
-              <View className="w-8 h-8 rounded-lg bg-secondaryContainer/50 items-center justify-center">
+              <View className="w-8 h-8 rounded-lg bg-secondaryContainer/50 items-center justify-center shrink-0">
                 <AppIcon name="check_circle" size={18} color={colors.secondary} />
               </View>
-              <View className="flex-1">
-                <Text className="text-sm font-bold text-onSurface">Stock Levels Healthy</Text>
-                <Text className="text-xs text-onSurfaceVariant">
+              <View className="flex-1 min-w-0">
+                <Text className="text-sm font-bold text-onSurface truncate">Stock Levels Healthy</Text>
+                <Text className="text-xs text-onSurfaceVariant truncate">
                   All products meet or exceed safety threshold
                 </Text>
               </View>
@@ -505,22 +505,22 @@ export default function HomeDashboardScreen() {
           {overdueCustomers.length > 0 && firstOverdue ? (
             <View className="bg-white p-3.5 rounded-xl border border-cardBorder shadow-sm relative overflow-hidden">
               <View className="absolute left-0 top-0 bottom-0 w-1 bg-error" />
-              <View className="flex-row items-start justify-between mb-2">
-                <View className="flex-row items-start gap-2">
-                  <View className="w-8 h-8 rounded-lg bg-errorContainer items-center justify-center">
+              <View className="flex-row items-start justify-between gap-2 mb-2">
+                <View className="flex-row items-start gap-2 flex-1 mr-2 min-w-0">
+                  <View className="w-8 h-8 rounded-lg bg-errorContainer items-center justify-center shrink-0">
                     <AppIcon name="notification_important" size={18} color={colors.error} />
                   </View>
-                  <View>
-                    <Text className="text-sm font-bold text-onSurface">
+                  <View className="flex-1 min-w-0">
+                    <Text numberOfLines={1} className="text-sm font-bold text-onSurface truncate">
                       {overdueCustomers.length} Overdue Debt
                       {overdueCustomers.length > 1 ? 's' : ''} (&gt;30 Days)
                     </Text>
-                    <Text className="text-xs text-onSurfaceVariant">
+                    <Text numberOfLines={1} className="text-xs text-onSurfaceVariant truncate">
                       {firstOverdue.name} • {firstOverdue.location}
                     </Text>
                   </View>
                 </View>
-                <View className="px-2 py-0.5 rounded bg-errorContainer">
+                <View className="px-2 py-0.5 rounded bg-errorContainer shrink-0">
                   <Text className="text-[10px] font-bold text-onErrorContainer uppercase">
                     Urgent
                   </Text>
