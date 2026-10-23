@@ -20,6 +20,7 @@ import type { Product, Customer } from '@/lib/db/types';
 import { printReceipt, shareReceiptPdf } from '@/lib/receipt';
 import { useStoreProfile } from '@/lib/store-profile';
 import { BarcodeScannerModal } from '@/components/barcode-scanner-modal';
+import { WaybillModal } from '@/components/waybill-modal';
 import { useResponsive } from '@/hooks/use-responsive';
 
 export type PriceTier = 'retail' | 'wholesale' | 'distributor';
@@ -75,6 +76,7 @@ export default function NewSaleModal() {
   const [showBarcodeScannerModal, setShowBarcodeScannerModal] = useState(false);
   const [skuSearchQuery, setSkuSearchQuery] = useState('');
   const [completedSale, setCompletedSale] = useState<{
+    id?: string;
     invoiceNo: string;
     netPayable: number;
     customerName: string;
@@ -85,6 +87,7 @@ export default function NewSaleModal() {
     discountAmount: number;
     items: CartItem[];
   } | null>(null);
+  const [showWaybillModal, setShowWaybillModal] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
 
   // Load products and customers from SQLite
@@ -265,7 +268,7 @@ export default function NewSaleModal() {
 
     try {
       setSubmitting(true);
-      await createSale(db, {
+      const saleId = await createSale(db, {
         invoiceNo,
         customerId: customerType === 'registered' ? selectedCustomerId : undefined,
         customerName:
@@ -291,6 +294,7 @@ export default function NewSaleModal() {
       triggerRefresh();
 
       setCompletedSale({
+        id: saleId,
         invoiceNo,
         netPayable,
         customerName:
@@ -1165,6 +1169,16 @@ export default function NewSaleModal() {
                 </Text>
               </Pressable>
 
+              <Pressable
+                onPress={() => setShowWaybillModal(true)}
+                className="w-full h-12 bg-primary/10 border border-primary/30 rounded-xl flex-row items-center justify-center gap-2 active:bg-primary/20 shadow-xs"
+              >
+                <AppIcon name="local_shipping" size={18} color={colors.primary} />
+                <Text className="text-xs font-bold text-primary">
+                  Issue Interstate Waybill / Dispatch Manifest
+                </Text>
+              </Pressable>
+
               <View className="flex-row gap-2 mt-1">
                 <Pressable
                   onPress={handleStartNextSale}
@@ -1187,6 +1201,31 @@ export default function NewSaleModal() {
           </View>
         </View>
       </Modal>
+
+      {/* 4. Interstate Waybill & Dispatch Manifest Modal */}
+      {completedSale && (
+        <WaybillModal
+          visible={showWaybillModal}
+          onClose={() => setShowWaybillModal(false)}
+          sale={{
+            id: completedSale.id || `sale_${Date.now()}`,
+            invoiceNo: completedSale.invoiceNo,
+            customerName: completedSale.customerName,
+            totalAmount: completedSale.totalAmount,
+            discountAmount: completedSale.discountAmount,
+            netPayable: completedSale.netPayable,
+            paymentChannel: completedSale.paymentChannel,
+            amountTendered: completedSale.amountTendered,
+            changeReturned: completedSale.changeReturned,
+            createdAt: new Date().toISOString(),
+            itemCount: completedSale.items.length,
+            itemsSummary: completedSale.items.map((it) => `${it.name} x${it.quantity}`).join(', '),
+          }}
+          onWaybillCreated={() => {
+            triggerRefresh();
+          }}
+        />
+      )}
     </View>
   );
 }
