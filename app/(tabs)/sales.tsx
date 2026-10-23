@@ -25,6 +25,7 @@ import {
   openNewShift,
   getSaleItems,
 } from '@/lib/db/queries';
+import { useResponsive } from '@/hooks/use-responsive';
 import type { SaleRecord, DashboardMetrics, ShiftRecord } from '@/lib/db/types';
 import { printReceipt, shareReceiptPdf } from '@/lib/receipt';
 
@@ -43,6 +44,7 @@ export default function SalesRegisterScreen() {
   const db = useAppDb();
   const { dataVersion } = useDataRefresh();
   const store = useStoreProfile();
+  const { isWide, horizontalPadding } = useResponsive();
 
   const [selectedRange, setSelectedRange] = useState<'today' | 'yesterday' | 'week'>('today');
   const [sales, setSales] = useState<SaleRecord[]>([]);
@@ -194,11 +196,20 @@ export default function SalesRegisterScreen() {
       <AppHeader />
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 80 }}
+        contentContainerStyle={{
+          paddingHorizontal: horizontalPadding,
+          paddingTop: isWide ? 20 : 14,
+          paddingBottom: 80,
+        }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {/* 1. Daily Sales Summary Banner */}
-        <View className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm mb-4">
+        <View className="w-full max-w-7xl mx-auto">
+          {/* Responsive 2-column layout on wide screens, stacked on phones */}
+          <View className={isWide ? 'flex-row gap-5 items-start' : ''}>
+            {/* Left Column on Tablet/Desktop: Register Pulse & Inflows & CTA Dock */}
+            <View className={isWide ? 'w-[400px] lg:w-[440px]' : 'w-full'}>
+              {/* 1. Daily Sales Summary Banner */}
+              <View className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm mb-4">
           <View className="flex-row items-center justify-between mb-3">
             <View className="flex-row items-center gap-1.5">
               <AppIcon name="analytics" size={20} color={colors.primary} />
@@ -402,7 +413,10 @@ export default function SalesRegisterScreen() {
             </View>
           </View>
         </View>
+      </View>
 
+      {/* Right Column on Tablet/Desktop: Recent Sales Register List */}
+      <View className={isWide ? 'flex-1 min-w-0' : 'w-full'}>
         {/* 4. Recent Sales Register List */}
         <View className="mb-4">
           <View className="flex-row items-center justify-between mb-2.5">
@@ -503,20 +517,23 @@ export default function SalesRegisterScreen() {
               </View>
             ))}
           </View>
-        )}
+          )}
+          </View>
         </View>
-      </ScrollView>
+      </View>
+    </View>
+  </ScrollView>
 
-      {/* Digital Receipt Modal */}
-      <Modal
-        visible={Boolean(selectedReceipt)}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSelectedReceipt(null)}
-      >
-        <View className="flex-1 bg-black/50 justify-end">
-          <View className="bg-white rounded-t-3xl p-5 border-t border-cardBorder max-h-[90%]">
-            <View className="w-12 h-1 bg-outlineVariant rounded-full self-center mb-3" />
+  {/* Digital Receipt Modal */}
+  <Modal
+    visible={Boolean(selectedReceipt)}
+    transparent
+    animationType="slide"
+    onRequestClose={() => setSelectedReceipt(null)}
+  >
+    <View className={`flex-1 bg-black/50 ${isWide ? 'justify-center items-center p-4' : 'justify-end'}`}>
+      <View className={`bg-white ${isWide ? 'rounded-3xl max-w-lg w-full p-6 shadow-2xl' : 'rounded-t-3xl p-5 border-t border-cardBorder max-h-[90%]'}`}>
+        <View className="w-12 h-1 bg-outlineVariant rounded-full self-center mb-3" />
 
             {/* Header */}
             <View className="items-center pb-3 border-b border-dashed border-cardBorder mb-4">
@@ -650,8 +667,8 @@ export default function SalesRegisterScreen() {
         transparent
         onRequestClose={() => setShowShiftModal(false)}
       >
-        <View className="flex-1 bg-black/60 justify-end">
-          <View className="bg-white rounded-t-3xl max-h-[90%] p-5 border-t border-cardBorder shadow-2xl">
+        <View className={`flex-1 bg-black/60 ${isWide ? 'justify-center items-center p-4' : 'justify-end'}`}>
+          <View className={`bg-white ${isWide ? 'rounded-3xl max-w-lg w-full p-6 shadow-2xl max-h-[85%]' : 'rounded-t-3xl max-h-[90%] p-5 border-t border-cardBorder shadow-2xl'}`}>
             {/* Modal Header */}
             <View className="flex-row items-center justify-between pb-3 border-b border-cardBorder mb-4">
               <View>

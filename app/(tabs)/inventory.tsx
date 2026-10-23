@@ -6,6 +6,7 @@ import { AppIcon } from '@/components/icon';
 import { colors } from '@/lib/theme';
 import { getProducts } from '@/lib/db/queries';
 import type { Product } from '@/lib/db/types';
+import { useResponsive } from '@/hooks/use-responsive';
 import { useDataRefresh, useAppDb } from '@/lib/db/provider';
 import { BarcodeScannerModal } from '@/components/barcode-scanner-modal';
 
@@ -13,6 +14,7 @@ export default function InventoryScreen() {
   const router = useRouter();
   const db = useAppDb();
   const { dataVersion } = useDataRefresh();
+  const { isWide, horizontalPadding } = useResponsive();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -74,10 +76,15 @@ export default function InventoryScreen() {
       <AppHeader />
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 80 }}
+        contentContainerStyle={{
+          paddingHorizontal: horizontalPadding,
+          paddingTop: isWide ? 20 : 14,
+          paddingBottom: 80,
+        }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {/* Top Action Header */}
+        <View className="w-full max-w-7xl mx-auto">
+          {/* Top Action Header */}
         <View className="flex-row items-center justify-between mb-3">
           <View className="flex-1 mr-2">
             <Text className="text-xl font-bold text-onSurface">Product Catalog</Text>
@@ -303,7 +310,7 @@ export default function InventoryScreen() {
             </Pressable>
           </View>
         ) : (
-          <View className="gap-3">
+          <View className={isWide ? 'flex-row flex-wrap gap-3' : 'gap-3'}>
             {filteredProducts.map((product) => {
               const margin = product.sellingPrice - product.costPrice;
               const marginPct = ((margin / product.costPrice) * 100).toFixed(1);
@@ -311,7 +318,9 @@ export default function InventoryScreen() {
               return (
               <View
                 key={product.id}
-                className="bg-white rounded-xl p-3.5 border border-cardBorder shadow-sm relative overflow-hidden"
+                className={`bg-white rounded-xl p-3.5 border border-cardBorder shadow-sm relative overflow-hidden ${
+                  isWide ? 'w-[49%]' : 'w-full'
+                }`}
               >
                 {/* Left Status Color Bar */}
                 <View
@@ -438,6 +447,7 @@ export default function InventoryScreen() {
           })}
         </View>
       )}
+        </View>
       </ScrollView>
 
       <BarcodeScannerModal

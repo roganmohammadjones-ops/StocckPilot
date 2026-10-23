@@ -22,6 +22,7 @@ import {
   getSales,
   getExpenses,
 } from '@/lib/db/queries';
+import { useResponsive } from '@/hooks/use-responsive';
 import type {
   DashboardMetrics,
   Product,
@@ -35,6 +36,7 @@ export default function HomeDashboardScreen() {
   const db = useAppDb();
   const { refreshTrigger } = useDataRefresh();
   const store = useStoreProfile();
+  const { isCompactPhone, isWide, horizontalPadding } = useResponsive();
 
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [lowStockProducts, setLowStockProducts] = useState<Product[]>([]);
@@ -117,136 +119,151 @@ export default function HomeDashboardScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 80 }}
+        contentContainerStyle={{
+          paddingHorizontal: horizontalPadding,
+          paddingTop: isWide ? 20 : 14,
+          paddingBottom: 80,
+        }}
       >
-        {/* Greeting & Shop Status */}
-        <View className="mb-4">
-          <View className="flex-row items-center justify-between mb-1">
-            <View className="flex-row items-center gap-1.5 flex-1">
-              <Text className="text-xl font-bold text-onSurface truncate">
-                Good day, {store.ownerName || 'Merchant'}
-              </Text>
-              <Text className="text-lg">👋</Text>
-            </View>
-            <View className="flex-row items-center gap-1 bg-surfaceContainer px-2 py-0.5 rounded-full">
-              <View className="w-1.5 h-1.5 rounded-full bg-primary" />
-              <Text className="text-[11px] font-medium text-onSurfaceVariant">Live SQLite</Text>
-            </View>
-          </View>
-          <View className="flex-row items-center justify-between">
-            <Text className="text-xs text-onSurfaceVariant truncate max-w-[240px]">
-              {store.businessName} • {store.marketLocation}
-            </Text>
-            <View className="flex-row items-center gap-1">
-              <AppIcon name="verified" size={13} color={colors.primary} />
-              <Text className="text-xs font-semibold text-primary">Store Open</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* 2x2 Financial Summary Matrix */}
-        <View className="flex-row flex-wrap gap-3 mb-5">
-          {/* Card 1: Today's Sales */}
-          <Pressable
-            onPress={() => router.push('/(tabs)/sales')}
-            className="flex-1 min-w-[155px] bg-white p-3.5 rounded-xl border border-cardBorder shadow-sm justify-between active:opacity-80"
-          >
+        <View className="w-full max-w-7xl mx-auto">
+          {/* Greeting & Shop Status */}
+          <View className="mb-4">
             <View className="flex-row items-center justify-between mb-1">
-              <Text className="text-xs font-medium text-onSurfaceVariant">{"Today's Sales"}</Text>
-              <AppIcon name="payments" size={18} color={colors.primary} />
+              <View className="flex-row items-center gap-1.5 flex-1">
+                <Text className="text-xl font-bold text-onSurface truncate">
+                  Good day, {store.ownerName || 'Merchant'}
+                </Text>
+                <Text className="text-lg">👋</Text>
+              </View>
+              <View className="flex-row items-center gap-1 bg-surfaceContainer px-2 py-0.5 rounded-full">
+                <View className="w-1.5 h-1.5 rounded-full bg-primary" />
+                <Text className="text-[11px] font-medium text-onSurfaceVariant">Live SQLite</Text>
+              </View>
             </View>
-            <Text className="text-2xl font-bold text-onSurface tracking-tight mb-1">
-              ₦{todaySales.toLocaleString()}
-            </Text>
-            <View className="gap-0.5">
-              {todaySales > 0 ? (
-                <View className="self-start flex-row items-center px-1.5 py-0.5 rounded bg-secondaryContainer/70">
-                  <AppIcon name="trending_up" size={12} color={colors.onSecondaryContainer} />
-                  <Text className="text-[11px] font-bold text-onSecondaryContainer ml-0.5">
-                    +{metrics?.salesGrowthPct ?? 0}%
-                  </Text>
-                </View>
-              ) : (
+            <View className="flex-row items-center justify-between">
+              <Text className="text-xs text-onSurfaceVariant truncate max-w-[240px]">
+                {store.businessName} • {store.marketLocation}
+              </Text>
+              <View className="flex-row items-center gap-1">
+                <AppIcon name="verified" size={13} color={colors.primary} />
+                <Text className="text-xs font-semibold text-primary">Store Open</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Financial Summary Matrix (2x2 on phones, 4-in-a-row on tablet/desktop) */}
+          <View className={`flex-row ${isWide ? 'flex-nowrap' : 'flex-wrap'} gap-3 mb-5`}>
+            {/* Card 1: Today's Sales */}
+            <Pressable
+              onPress={() => router.push('/(tabs)/sales')}
+              className={`flex-1 ${
+                isWide ? 'min-w-[180px]' : isCompactPhone ? 'w-[48%]' : 'min-w-[150px]'
+              } bg-white p-3.5 rounded-xl border border-cardBorder shadow-sm justify-between active:opacity-80`}
+            >
+              <View className="flex-row items-center justify-between mb-1">
+                <Text className="text-xs font-medium text-onSurfaceVariant">{"Today's Sales"}</Text>
+                <AppIcon name="payments" size={18} color={colors.primary} />
+              </View>
+              <Text className="text-2xl font-bold text-onSurface tracking-tight mb-1">
+                ₦{todaySales.toLocaleString()}
+              </Text>
+              <View className="gap-0.5">
+                {todaySales > 0 ? (
+                  <View className="self-start flex-row items-center px-1.5 py-0.5 rounded bg-secondaryContainer/70">
+                    <AppIcon name="trending_up" size={12} color={colors.onSecondaryContainer} />
+                    <Text className="text-[11px] font-bold text-onSecondaryContainer ml-0.5">
+                      +{metrics?.salesGrowthPct ?? 0}%
+                    </Text>
+                  </View>
+                ) : (
+                  <View className="self-start px-1.5 py-0.5 rounded bg-surfaceContainer">
+                    <Text className="text-[11px] font-semibold text-onSurfaceVariant">
+                      No sales today
+                    </Text>
+                  </View>
+                )}
+                <Text className="text-[11px] text-onSurfaceVariant">
+                  {salesCount} {salesCount === 1 ? 'transaction' : 'transactions'}
+                </Text>
+              </View>
+            </Pressable>
+
+            {/* Card 2: Est. Gross Profit */}
+            <View
+              className={`flex-1 ${
+                isWide ? 'min-w-[180px]' : isCompactPhone ? 'w-[48%]' : 'min-w-[150px]'
+              } bg-white p-3.5 rounded-xl border border-cardBorder shadow-sm justify-between`}
+            >
+              <View className="flex-row items-center justify-between mb-1">
+                <Text className="text-xs font-medium text-onSurfaceVariant">Est. Gross Profit</Text>
+                <AppIcon name="query_stats" size={18} color={colors.secondary} />
+              </View>
+              <Text className="text-2xl font-bold text-onSurface tracking-tight mb-1">
+                ₦{estProfit.toLocaleString()}
+              </Text>
+              <View className="gap-0.5">
                 <View className="self-start px-1.5 py-0.5 rounded bg-surfaceContainer">
                   <Text className="text-[11px] font-semibold text-onSurfaceVariant">
-                    No sales today
+                    19.0% Margin
                   </Text>
                 </View>
-              )}
-              <Text className="text-[11px] text-onSurfaceVariant">
-                {salesCount} {salesCount === 1 ? 'transaction' : 'transactions'}
+                <Text className="text-[11px] text-onSurfaceVariant">Based on landed costs</Text>
+              </View>
+            </View>
+
+            {/* Card 3: Customer Debts */}
+            <Pressable
+              onPress={() => router.push('/(tabs)/customers')}
+              className={`flex-1 ${
+                isWide ? 'min-w-[180px]' : isCompactPhone ? 'w-[48%]' : 'min-w-[150px]'
+              } bg-white p-3.5 rounded-xl border border-cardBorder shadow-sm justify-between active:opacity-80`}
+            >
+              <View className="flex-row items-center justify-between mb-1">
+                <Text className="text-xs font-medium text-onSurfaceVariant">Customer Debts</Text>
+                <AppIcon name="receipt_long" size={18} color={colors.error} />
+              </View>
+              <Text className="text-2xl font-bold text-onSurface tracking-tight mb-1">
+                ₦{creditOutstanding.toLocaleString()}
               </Text>
-            </View>
-          </Pressable>
-
-          {/* Card 2: Est. Gross Profit */}
-          <View className="flex-1 min-w-[155px] bg-white p-3.5 rounded-xl border border-cardBorder shadow-sm justify-between">
-            <View className="flex-row items-center justify-between mb-1">
-              <Text className="text-xs font-medium text-onSurfaceVariant">Est. Gross Profit</Text>
-              <AppIcon name="query_stats" size={18} color={colors.secondary} />
-            </View>
-            <Text className="text-2xl font-bold text-onSurface tracking-tight mb-1">
-              ₦{estProfit.toLocaleString()}
-            </Text>
-            <View className="gap-0.5">
-              <View className="self-start px-1.5 py-0.5 rounded bg-surfaceContainer">
-                <Text className="text-[11px] font-semibold text-onSurfaceVariant">
-                  19.0% Margin
-                </Text>
+              <View className="gap-0.5">
+                <View className="self-start px-1.5 py-0.5 rounded bg-errorContainer">
+                  <Text className="text-[11px] font-bold text-onErrorContainer">
+                    {owingCount} owing
+                  </Text>
+                </View>
+                <View className="flex-row items-center">
+                  <Text className="text-[11px] font-semibold text-primary">View ledger</Text>
+                  <AppIcon name="chevron_right" size={13} color={colors.primary} />
+                </View>
               </View>
-              <Text className="text-[11px] text-onSurfaceVariant">Based on landed costs</Text>
-            </View>
+            </Pressable>
+
+            {/* Card 4: Total Stock Valuation */}
+            <Pressable
+              onPress={() => router.push('/(tabs)/inventory')}
+              className={`flex-1 ${
+                isWide ? 'min-w-[180px]' : isCompactPhone ? 'w-[48%]' : 'min-w-[150px]'
+              } bg-white p-3.5 rounded-xl border border-cardBorder shadow-sm justify-between active:opacity-80`}
+            >
+              <View className="flex-row items-center justify-between mb-1">
+                <Text className="text-xs font-medium text-onSurfaceVariant">Total Stock Value</Text>
+                <AppIcon name="warehouse" size={18} color={colors.tertiary} />
+              </View>
+              <Text className="text-2xl font-bold text-onSurface tracking-tight mb-1">
+                {stockValuation >= 1_000_000
+                  ? `₦${(stockValuation / 1_000_000).toFixed(2)}M`
+                  : `₦${stockValuation.toLocaleString()}`}
+              </Text>
+              <View className="gap-0.5">
+                <View className="self-start px-1.5 py-0.5 rounded bg-surfaceContainer">
+                  <Text className="text-[11px] font-semibold text-onSurfaceVariant">
+                    {totalProducts} SKUs
+                  </Text>
+                </View>
+                <Text className="text-[11px] text-onSurfaceVariant">In warehouse & shop</Text>
+              </View>
+            </Pressable>
           </View>
-
-          {/* Card 3: Customer Debts */}
-          <Pressable
-            onPress={() => router.push('/(tabs)/customers')}
-            className="flex-1 min-w-[155px] bg-white p-3.5 rounded-xl border border-cardBorder shadow-sm justify-between active:opacity-80"
-          >
-            <View className="flex-row items-center justify-between mb-1">
-              <Text className="text-xs font-medium text-onSurfaceVariant">Customer Debts</Text>
-              <AppIcon name="receipt_long" size={18} color={colors.error} />
-            </View>
-            <Text className="text-2xl font-bold text-onSurface tracking-tight mb-1">
-              ₦{creditOutstanding.toLocaleString()}
-            </Text>
-            <View className="gap-0.5">
-              <View className="self-start px-1.5 py-0.5 rounded bg-errorContainer">
-                <Text className="text-[11px] font-bold text-onErrorContainer">
-                  {owingCount} owing
-                </Text>
-              </View>
-              <View className="flex-row items-center">
-                <Text className="text-[11px] font-semibold text-primary">View ledger</Text>
-                <AppIcon name="chevron_right" size={13} color={colors.primary} />
-              </View>
-            </View>
-          </Pressable>
-
-          {/* Card 4: Total Stock Valuation */}
-          <Pressable
-            onPress={() => router.push('/(tabs)/inventory')}
-            className="flex-1 min-w-[155px] bg-white p-3.5 rounded-xl border border-cardBorder shadow-sm justify-between active:opacity-80"
-          >
-            <View className="flex-row items-center justify-between mb-1">
-              <Text className="text-xs font-medium text-onSurfaceVariant">Total Stock Value</Text>
-              <AppIcon name="warehouse" size={18} color={colors.tertiary} />
-            </View>
-            <Text className="text-2xl font-bold text-onSurface tracking-tight mb-1">
-              {stockValuation >= 1_000_000
-                ? `₦${(stockValuation / 1_000_000).toFixed(2)}M`
-                : `₦${stockValuation.toLocaleString()}`}
-            </Text>
-            <View className="gap-0.5">
-              <View className="self-start px-1.5 py-0.5 rounded bg-surfaceContainer">
-                <Text className="text-[11px] font-semibold text-onSurfaceVariant">
-                  {totalProducts} SKUs
-                </Text>
-              </View>
-              <Text className="text-[11px] text-onSurfaceVariant">In warehouse & shop</Text>
-            </View>
-          </Pressable>
-        </View>
 
         {/* Frequent Actions (4 Quick Buttons) */}
         <View className="mb-5">
@@ -309,8 +326,12 @@ export default function HomeDashboardScreen() {
           </View>
         </View>
 
-        {/* Sales Performance Hourly Bar Chart Card */}
-        <View className="bg-white p-4 rounded-xl border border-cardBorder shadow-sm mb-5">
+        {/* Responsive Dashboard Grid: 2 columns on wide screens, stacked on phones */}
+        <View className={isWide ? 'flex-row gap-5 items-start' : ''}>
+          {/* Left Column on Tablet/Desktop: Hourly Performance & Action Needed */}
+          <View className={isWide ? 'flex-1 min-w-0' : 'w-full'}>
+            {/* Sales Performance Hourly Bar Chart Card */}
+            <View className="bg-white p-4 rounded-xl border border-cardBorder shadow-sm mb-5">
           <View className="flex-row items-center justify-between mb-3">
             <View>
               <Text className="text-base font-bold text-onSurface">Hourly Performance</Text>
@@ -546,7 +567,10 @@ export default function HomeDashboardScreen() {
             </View>
           )}
         </View>
+      </View>
 
+      {/* Right Column on Tablet/Desktop: Recent Shop Activity Feed */}
+      <View className={isWide ? 'w-[380px] lg:w-[420px]' : 'w-full'}>
         {/* Recent Shop Activity Feed */}
         <View className="bg-white p-4 rounded-xl border border-cardBorder shadow-sm">
           <View className="flex-row items-center justify-between mb-3">
@@ -620,7 +644,10 @@ export default function HomeDashboardScreen() {
             </View>
           )}
         </View>
-      </ScrollView>
+      </View>
     </View>
-  );
+  </View>
+</ScrollView>
+</View>
+);
 }

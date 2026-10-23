@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { AppIcon } from './icon';
 import { BrandLogo } from './brand-logo';
+import { useResponsive } from '@/hooks/use-responsive';
 import { colors } from '@/lib/theme';
 import { useStoreProfile } from '@/lib/store-profile';
 
@@ -17,13 +18,29 @@ export function AppHeader({ title, subtitle, showBack = false }: AppHeaderProps)
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const store = useStoreProfile();
+  const { isCompactPhone, isWide, horizontalPadding } = useResponsive();
+
+  const businessNameMaxW = isCompactPhone
+    ? 'max-w-[120px]'
+    : isWide
+    ? 'max-w-[340px]'
+    : 'max-w-[180px]';
+
+  const locationMaxW = isCompactPhone
+    ? 'max-w-[105px]'
+    : isWide
+    ? 'max-w-[280px]'
+    : 'max-w-[150px]';
 
   return (
     <View
-      style={{ paddingTop: Math.max(insets.top, 12) }}
-      className="bg-white border-b border-cardBorder shadow-sm px-4 pb-3 z-30"
+      style={{
+        paddingTop: Math.max(insets.top, 12),
+        paddingHorizontal: horizontalPadding,
+      }}
+      className="bg-white border-b border-cardBorder shadow-sm pb-3 z-30"
     >
-      <View className="flex-row items-center justify-between">
+      <View className="w-full max-w-7xl mx-auto flex-row items-center justify-between">
         {showBack ? (
           <View className="flex-row items-center gap-2 flex-1 min-w-0">
             <Pressable
@@ -61,14 +78,14 @@ export function AppHeader({ title, subtitle, showBack = false }: AppHeaderProps)
                 onPress={() => router.push('/settings')}
                 className="flex-row items-center gap-0.5 active:opacity-75"
               >
-                <Text className="text-sm font-bold text-onSurface truncate max-w-[160px]">
+                <Text className={`text-sm font-bold text-onSurface truncate ${businessNameMaxW}`}>
                   {store.businessName || 'StockPilot Store'}
                 </Text>
                 <AppIcon name="arrow_drop_down" size={18} color={colors.onSurfaceVariant} />
               </Pressable>
               <View className="flex-row items-center gap-1">
                 <AppIcon name="location_on" size={12} color={colors.outline} />
-                <Text className="text-[11px] font-medium text-outline truncate max-w-[140px]">
+                <Text className={`text-[11px] font-medium text-outline truncate ${locationMaxW}`}>
                   {store.marketLocation || 'Lagos, Nigeria'}
                 </Text>
               </View>
@@ -79,11 +96,13 @@ export function AppHeader({ title, subtitle, showBack = false }: AppHeaderProps)
         {/* Right Status Actions */}
         <View className="flex-row items-center gap-2">
           {/* Synced Pill */}
-          <View className="flex-row items-center gap-1.5 px-2.5 py-1 bg-secondaryContainer/50 rounded-full">
+          <View className={`flex-row items-center gap-1.5 ${isCompactPhone ? 'px-2 py-1' : 'px-2.5 py-1'} bg-secondaryContainer/50 rounded-full`}>
             <View className="w-2 h-2 rounded-full bg-primary" />
-            <Text className="text-[11px] font-semibold text-onSecondaryContainer">
-              Synced
-            </Text>
+            {!isCompactPhone && (
+              <Text className="text-[11px] font-semibold text-onSecondaryContainer">
+                Synced
+              </Text>
+            )}
           </View>
 
           {/* Notifications Trigger */}

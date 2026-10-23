@@ -27,12 +27,19 @@ import {
 } from '@/lib/db/queries';
 import type { Customer, DashboardMetrics } from '@/lib/db/types';
 import { sharePaymentReceiptPdf, shareStatementPdf } from '@/lib/receipt';
+import { useResponsive } from '@/hooks/use-responsive';
+import {
+  openDebtorWhatsApp,
+  shareDebtorNotice,
+  shareBatchOverdueSummary,
+} from '@/lib/debt-recovery';
 
 export default function CustomersLedgerScreen() {
   const router = useRouter();
   const db = useAppDb();
   const { refreshTrigger, triggerRefresh } = useDataRefresh();
   const store = useStoreProfile();
+  const { isWide, horizontalPadding } = useResponsive();
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
@@ -41,6 +48,10 @@ export default function CustomersLedgerScreen() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'owing' | 'overdue' | 'zero'>('all');
+
+  // Overdue Escalation Hub Modal State
+  const [showEscalationModal, setShowEscalationModal] = useState(false);
+  const [isSharingBatch, setIsSharingBatch] = useState(false);
 
   // Payment Modal State
   const [paymentCustomer, setPaymentCustomer] = useState<Customer | null>(null);
@@ -217,10 +228,15 @@ export default function CustomersLedgerScreen() {
   const totalCount = metrics?.totalCustomersCount ?? customers.length;
   const zeroCount = Math.max(0, totalCount - owingCount);
 
+  // Overdue debtors list
+  const overdueCustomers = customers.filter(
+    (c) =>
+      c.debtStatus === 'overdue' ||
+      (c.balance > 0 && typeof c.dueText === 'string' && c.dueText.toLowerCase().includes('overdue'))
+  );
+
   // Compute overdue amount
-  const overdueAmount = customers
-    .filter((c) => c.debtStatus === 'overdue')
-    .reduce((sum, c) => sum + c.balance, 0);
+  const overdueAmount = overdueCustomers.reduce((sum, c) => sum + c.balance, 0);
 
   return (
     <View className="flex-1 bg-surface">
@@ -228,10 +244,15 @@ export default function CustomersLedgerScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 80 }}
+        contentContainerStyle={{
+          paddingHorizontal: horizontalPadding,
+          paddingTop: isWide ? 20 : 14,
+          paddingBottom: 80,
+        }}
       >
-        {/* Debt Ledger Summary Panel */}
-        <View className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm mb-4">
+        <View className="w-full max-w-7xl mx-auto">
+          {/* Debt Ledger Summary Panel */}
+          <View className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm mb-4">
           <View className="flex-row items-center justify-between mb-3">
             <View className="flex-row items-center gap-1.5">
               <AppIcon name="warning" size={18} color={colors.error} />
@@ -239,10 +260,10 @@ export default function CustomersLedgerScreen() {
                 Credit Ledger & Receivables
               </Text>
             </View>
-            <View className={`flex-row items-center gap-1 px-2.5 py-0.5 rounded-full ${overdueCount > 0 ? 'bg-errorContainer' : 'bg-secondaryContainer'}`}>
-              <View className={`w-1.5 h-1.5 rounded-full ${overdueCount > 0 ? 'bg-error' : 'bg-primary'}`} />
-              <Text className={`text-xs font-bold ${overdueCount > 0 ? 'text-onErrorContainer' : 'text-onSecondaryContainer'}`}>
-                {overdueCount > 0 ? `High Risk: ${overdueCount} Overdue` : 'All Accounts Good'}
+            <View className={`flex-row items-center gap-1 px-2.5 py-0.5 rounded-full ${overdueCustomers.length > 0 ? 'bg-errorContainer' : 'bg-secondaryContainer'}`}>
+              <View className={`w-1.5 h-1.5 rounded-full ${overdueCustomers.length > 0 ? 'bg-error' : 'bg-primary'}`} />
+              <Text className={`text-xs font-bold ${overdueCustomers.length > 0 ? 'text-onErrorContainer' : 'text-onSecondaryContainer'}`}>
+                {overdueCustomers.length > 0 ? `High Risk: ${overdueCustomers.length} Overdue` : 'All Accounts Good'}
               </Text>
             </View>
           </View>
@@ -265,10 +286,36 @@ export default function CustomersLedgerScreen() {
                 ₦{overdueAmount.toLocaleString()}
               </Text>
               <Text className="text-[11px] text-error font-medium mt-0.5">
-                {overdueCount} {overdueCount === 1 ? 'Account' : 'Accounts'} in default
+                {overdueCustomers.length} {overdueCustomers.length === 1 ? 'Account' : 'Accounts'} in default
               </Text>
             </View>
           </View>
+
+          {/* Overdue Debt Escalation Action Banner */}
+          {overdueCustomers.length > 0 && (
+            <Pressable
+              onPress={() => setShowEscalationModal(true)}
+              className="w-full bg-error rounded-xl p-3 flex-row items-center justify-between active:opacity-90 mb-3 shadow-xs"
+            >
+              <View className="flex-row items-center gap-2.5 flex-1 mr-2">
+                <View className="w-8 h-8 rounded-lg bg-white/20 items-center justify-center">
+                  <AppIcon name="campaign" size={20} color="#ffffff" />
+                </View>
+                <View className="flex-1 min-w-0">
+                  <Text className="text-xs font-bold text-white truncate">
+                    Overdue Debt Escalation Hub
+                  </Text>
+                  <Text className="text-[11px] text-white/90 truncate">
+                    Dispatch WhatsApp demands & bank details to {overdueCustomers.length} accounts
+                  </Text>
+                </View>
+              </View>
+              <View className="px-2.5 py-1 rounded-full bg-white/25 flex-row items-center gap-1">
+                <Text className="text-[11px] font-bold text-white">Escalate</Text>
+                <AppIcon name="arrow_forward" size={12} color="#ffffff" />
+              </View>
+            </Pressable>
+          )}
 
           {/* Filter Tabs */}
           <ScrollView
@@ -387,11 +434,13 @@ export default function CustomersLedgerScreen() {
 
         {/* Ledger Customer Cards */}
         {!isLoading && (
-          <View className="gap-3">
+          <View className={isWide ? 'flex-row flex-wrap gap-3' : 'gap-3'}>
             {customers.map((cust) => (
               <View
                 key={cust.id}
-                className="bg-white rounded-xl p-4 border border-cardBorder shadow-sm relative overflow-hidden"
+                className={`bg-white rounded-xl p-4 border border-cardBorder shadow-sm relative overflow-hidden ${
+                  isWide ? 'w-[49%]' : 'w-full'
+                }`}
               >
                 {/* Left Indicator Band */}
                 <View
@@ -495,13 +544,17 @@ export default function CustomersLedgerScreen() {
 
                   <Pressable
                     onPress={() => {
-                      Linking.openURL(
-                        `https://wa.me/${cust.phone.replace(/[^0-9]/g, '')}?text=Hello%20${encodeURIComponent(
-                          cust.name
-                        )},%20this%20is%20${encodeURIComponent(
-                          store.businessName
-                        )}%20regarding%20your%20statement%20of%20₦${cust.balance.toLocaleString()}.`
-                      );
+                      if (cust.balance > 0) {
+                        openDebtorWhatsApp(cust, store);
+                      } else {
+                        Linking.openURL(
+                          `https://wa.me/${cust.phone.replace(/[^0-9]/g, '')}?text=Hello%20${encodeURIComponent(
+                            cust.name
+                          )},%20this%20is%20${encodeURIComponent(
+                            store.businessName
+                          )}.%20Your%20trade%20account%20has%20zero%20outstanding%20balance.%20Thank%20you%20for%20your%20patronage!`
+                        );
+                      }
                     }}
                     className="flex-1 h-9 rounded-lg bg-secondaryContainer items-center justify-center flex-row gap-1 active:opacity-80"
                   >
@@ -532,7 +585,192 @@ export default function CustomersLedgerScreen() {
             ))}
           </View>
         )}
+        </View>
       </ScrollView>
+
+      {/* Overdue Debt Escalation Hub Modal */}
+      <Modal
+        visible={showEscalationModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowEscalationModal(false)}
+      >
+        <View className={`flex-1 bg-black/60 ${isWide ? 'justify-center items-center p-4' : 'justify-end'}`}>
+          <View className={`bg-white ${isWide ? 'rounded-3xl max-w-lg w-full p-6 shadow-2xl max-h-[85%]' : 'rounded-t-3xl max-h-[90%] p-5 border-t border-cardBorder shadow-2xl'}`}>
+            {/* Modal Header */}
+            <View className="flex-row items-center justify-between pb-3 border-b border-cardBorder mb-4">
+              <View className="flex-1 mr-2">
+                <View className="flex-row items-center gap-1.5">
+                  <AppIcon name="campaign" size={20} color={colors.error} />
+                  <Text className="text-base font-bold text-onSurface">
+                    Overdue Debt Escalation Hub
+                  </Text>
+                </View>
+                <Text className="text-xs text-onSurfaceVariant mt-0.5">
+                  {overdueCustomers.length} Accounts in Default • ₦{overdueAmount.toLocaleString()} Total Overdue
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => setShowEscalationModal(false)}
+                className="w-8 h-8 rounded-full bg-surfaceContainerLow items-center justify-center"
+              >
+                <AppIcon name="close" size={18} color={colors.onSurfaceVariant} />
+              </Pressable>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {/* Active Settlement Bank Card */}
+              <View className="bg-secondaryContainer/40 border border-secondary/30 rounded-2xl p-3.5 mb-4">
+                <View className="flex-row items-center justify-between mb-1">
+                  <Text className="text-xs font-bold text-onSecondaryContainer">
+                    Active Settlement Account
+                  </Text>
+                  <View className="px-2 py-0.5 rounded bg-secondaryContainer">
+                    <Text className="text-[10px] font-bold text-onSecondaryContainer uppercase">
+                      Receiving Bank
+                    </Text>
+                  </View>
+                </View>
+                {store.settlementAccounts?.[0] ? (
+                  <View>
+                    <Text className="text-sm font-bold text-onSurface">
+                      {store.settlementAccounts[0].bankName} • {store.settlementAccounts[0].accountNumber}
+                    </Text>
+                    <Text className="text-xs text-onSurfaceVariant mt-0.5">
+                      Name: {store.settlementAccounts[0].accountName}
+                    </Text>
+                    <Text className="text-[10px] text-outline mt-1">
+                      This verified bank account is automatically embedded in all demand notices for instant transfer.
+                    </Text>
+                  </View>
+                ) : (
+                  <Text className="text-xs text-onSurfaceVariant">
+                    No default settlement bank configured. Configure in Settings.
+                  </Text>
+                )}
+              </View>
+
+              {/* Action Toolbar: Batch Audit Export */}
+              <View className="flex-row gap-2 mb-4">
+                <Pressable
+                  disabled={isSharingBatch || overdueCustomers.length === 0}
+                  onPress={async () => {
+                    try {
+                      setIsSharingBatch(true);
+                      await shareBatchOverdueSummary(overdueCustomers, store);
+                    } catch (e: any) {
+                      Alert.alert('Share Error', e?.message || 'Could not share overdue schedule.');
+                    } finally {
+                      setIsSharingBatch(false);
+                    }
+                  }}
+                  className="flex-1 h-11 bg-surfaceContainer border border-cardBorder rounded-xl flex-row items-center justify-center gap-1.5 active:bg-surfaceContainerHigh"
+                >
+                  <AppIcon name="share" size={16} color={colors.onSurface} />
+                  <Text className="text-xs font-bold text-onSurface">
+                    {isSharingBatch ? 'Sharing Schedule...' : 'Share Overdue Audit Sheet'}
+                  </Text>
+                </Pressable>
+              </View>
+
+              {/* Debtors List */}
+              <Text className="text-xs font-bold text-onSurfaceVariant uppercase tracking-wider mb-2.5">
+                Debtors Requiring Follow-Up ({overdueCustomers.length})
+              </Text>
+
+              {overdueCustomers.length === 0 ? (
+                <View className="p-8 items-center justify-center bg-surfaceContainerLow rounded-2xl mb-6">
+                  <AppIcon name="check_circle" size={32} color={colors.primary} />
+                  <Text className="text-sm font-bold text-onSurface mt-2">Zero Overdue Debtors!</Text>
+                  <Text className="text-xs text-onSurfaceVariant mt-0.5 text-center">
+                    All customer accounts are currently within standard credit terms.
+                  </Text>
+                </View>
+              ) : (
+                <View className="gap-3 mb-6">
+                  {overdueCustomers.map((cust) => (
+                    <View
+                      key={cust.id}
+                      className="bg-white border border-cardBorder rounded-2xl p-3.5 shadow-sm"
+                    >
+                      <View className="flex-row items-start justify-between mb-2">
+                        <View className="flex-1 mr-2">
+                          <Text className="text-sm font-bold text-onSurface">{cust.name}</Text>
+                          <Text className="text-xs text-onSurfaceVariant">{cust.location} • {cust.phone}</Text>
+                        </View>
+                        <View className="items-end">
+                          <Text className="text-base font-bold text-error">
+                            ₦{cust.balance.toLocaleString()}
+                          </Text>
+                          <Text className="text-[10px] font-bold text-error uppercase bg-errorContainer px-1.5 py-0.5 rounded mt-0.5">
+                            {cust.dueText}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Line Details */}
+                      <View className="bg-surfaceContainerLow rounded-xl p-2.5 mb-3 gap-1">
+                        <View className="flex-row justify-between text-xs">
+                          <Text className="text-[11px] text-onSurfaceVariant">Last Order:</Text>
+                          <Text className="text-[11px] font-medium text-onSurface">
+                            {cust.lastCredit || 'No credit sales yet'}
+                          </Text>
+                        </View>
+                        <View className="flex-row justify-between text-xs">
+                          <Text className="text-[11px] text-onSurfaceVariant">Last Payment:</Text>
+                          <Text className="text-[11px] font-medium text-secondary">
+                            {cust.lastPayment || 'None recorded'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Action Buttons for this Debtor */}
+                      <View className="flex-row gap-2">
+                        <Pressable
+                          onPress={() => openDebtorWhatsApp(cust, store)}
+                          className="flex-1 h-10 bg-secondaryContainer rounded-xl flex-row items-center justify-center gap-1.5 active:opacity-80"
+                        >
+                          <AppIcon name="chat" size={16} color={colors.onSecondaryContainer} />
+                          <Text className="text-xs font-bold text-onSecondaryContainer">
+                            WhatsApp Demand
+                          </Text>
+                        </Pressable>
+
+                        <Pressable
+                          onPress={() => shareDebtorNotice(cust, store)}
+                          className="h-10 px-3 bg-surfaceContainer rounded-xl flex-row items-center justify-center gap-1 active:bg-surfaceContainerHigh"
+                        >
+                          <AppIcon name="share" size={16} color={colors.onSurface} />
+                          <Text className="text-xs font-medium text-onSurface">Share</Text>
+                        </Pressable>
+
+                        <Pressable
+                          onPress={() => Linking.openURL(`tel:${cust.phone.replace(/[^0-9+]/g, '')}`)}
+                          className="h-10 px-3 bg-surfaceContainer rounded-xl flex-row items-center justify-center gap-1 active:bg-surfaceContainerHigh"
+                        >
+                          <AppIcon name="phone" size={16} color={colors.primary} />
+                          <Text className="text-xs font-medium text-primary">Call</Text>
+                        </Pressable>
+
+                        <Pressable
+                          onPress={() => {
+                            setShowEscalationModal(false);
+                            openPaymentModal(cust);
+                          }}
+                          className="h-10 px-3 bg-primary rounded-xl flex-row items-center justify-center gap-1 active:bg-primaryContainer"
+                        >
+                          <AppIcon name="payments" size={16} color="#ffffff" />
+                          <Text className="text-xs font-bold text-white">Settle</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Repayment Modal */}
       <Modal
@@ -541,8 +779,8 @@ export default function CustomersLedgerScreen() {
         animationType="slide"
         onRequestClose={() => setPaymentCustomer(null)}
       >
-        <View className="flex-1 bg-black/50 justify-end">
-          <View className="bg-white rounded-t-3xl p-5 border-t border-cardBorder max-h-[85%]">
+        <View className={`flex-1 bg-black/50 ${isWide ? 'justify-center items-center p-4' : 'justify-end'}`}>
+          <View className={`bg-white ${isWide ? 'rounded-3xl max-w-lg w-full p-6 shadow-2xl max-h-[85%]' : 'rounded-t-3xl p-5 border-t border-cardBorder max-h-[85%]'}`}>
             <View className="w-12 h-1 bg-outlineVariant rounded-full self-center mb-3" />
 
             <View className="flex-row items-center justify-between mb-4">
@@ -654,8 +892,8 @@ export default function CustomersLedgerScreen() {
         animationType="slide"
         onRequestClose={() => setShowAddCustomerModal(false)}
       >
-        <View className="flex-1 bg-black/50 justify-end">
-          <View className="bg-white rounded-t-3xl p-5 border-t border-cardBorder max-h-[90%]">
+        <View className={`flex-1 bg-black/50 ${isWide ? 'justify-center items-center p-4' : 'justify-end'}`}>
+          <View className={`bg-white ${isWide ? 'rounded-3xl max-w-lg w-full p-6 shadow-2xl max-h-[85%]' : 'rounded-t-3xl p-5 border-t border-cardBorder max-h-[90%]'}`}>
             <View className="w-12 h-1 bg-outlineVariant rounded-full self-center mb-3" />
 
             <View className="flex-row items-center justify-between mb-4">
